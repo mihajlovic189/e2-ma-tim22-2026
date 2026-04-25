@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.SlagalicaApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:fontFamily">@font/saira</item>
+        <item name="fontFamily">@font/saira</item>
+    </style>
+
+    <style name="Theme.SlagalicaApp" parent="Base.Theme.SlagalicaApp" />
+</resources>
