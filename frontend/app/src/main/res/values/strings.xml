@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">SlagalicaApp</string>
+    <string-array name="regioni_srbije">
+        <item>Beograd</item>
+        <item>Vojvodina</item>
+        <item>Centralna Srbija</item>
+        <item>Južna Srbija</item>
+    </string-array>
+</resources>
