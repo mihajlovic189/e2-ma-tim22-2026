@@ -18,4 +18,20 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="30dp"
         android:text="Promeni Lozinku" />
+
+    <Button
+        android:id="@+id/btnKorakPoKorak"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Igra: Korak po korak"
+        android:backgroundTint="#4CAF50" />
+
+    <Button
+        android:id="@+id/btnMojBroj"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Igra: Moj broj"
+        android:backgroundTint="#FF9800" />
 </LinearLayout>

@@ -1,11 +1,13 @@
 <resources>
     <string name="app_name">SlagalicaApp</string>
     <string-array name="regioni_srbije">
+        <item>Izaberi region...</item>
         <item>Beograd</item>
         <item>Vojvodina</item>
         <item>Centralna Srbija</item>
         <item>Južna Srbija</item>
     </string-array>
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="placeholder_one">"?"</string>
+    <string name="placeholder_two">"??"</string>
+    <string name="placeholder_three">"???"</string>
 </resources>

@@ -3,7 +3,41 @@
     <style name="Base.Theme.SlagalicaApp" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:fontFamily">@font/saira</item>
         <item name="fontFamily">@font/saira</item>
+        <item name="colorOnSurface">@color/text</item>
     </style>
 
     <style name="Theme.SlagalicaApp" parent="Base.Theme.SlagalicaApp" />
+
+    <style name="StepStyle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginBottom">10dp</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:background">@drawable/input_bg</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="MojBrojBtn" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">50dp</item>
+        <item name="android:layout_height">50dp</item>
+        <item name="android:layout_margin">4dp</item>
+        <item name="android:backgroundTint">#1E293B</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="cornerRadius">4dp</item> </style>
+
+    <style name="OperandBtn" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">48dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_margin">4dp</item>
+        <item name="android:backgroundTint">@color/primary</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="cornerRadius">24dp</item> </style>
 </resources>
