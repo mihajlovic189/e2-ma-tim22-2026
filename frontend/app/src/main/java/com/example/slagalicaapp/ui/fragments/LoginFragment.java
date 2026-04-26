@@ -25,7 +25,7 @@ public class LoginFragment extends Fragment {
         viewModel = new ViewModelProvider(this).get(AuthViewModel.class);
 
         binding.btnLogin.setOnClickListener(v -> {
-            String id = binding.etIdentity.getText().toString();
+            String id = binding.etIdentity.getText().toString().trim();
             String pass = binding.etPassword.getText().toString();
 
             if (TextUtils.isEmpty(id) || TextUtils.isEmpty(pass)) {
@@ -35,14 +35,13 @@ public class LoginFragment extends Fragment {
 
             viewModel.login(id, pass).observe(getViewLifecycleOwner(), user -> {
                 if (user != null) {
-                    String token = user.getToken();
-                    android.content.SharedPreferences prefs = requireActivity().getSharedPreferences("MyPrefs", android.content.Context.MODE_PRIVATE);
-                    android.content.SharedPreferences.Editor editor = prefs.edit();
-                    editor.putString("jwt_token", token);
-                    editor.apply();
-                    Toast.makeText(getContext(), "Login uspješan", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Login uspešan!", Toast.LENGTH_SHORT).show();
+
+                    getParentFragmentManager().beginTransaction()
+                            .replace(R.id.fragment_container, new HomeFragment())
+                            .commit();
                 } else {
-                    Toast.makeText(getContext(), "Greška", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Neuspešan login. Proverite podatke/verifikaciju.", Toast.LENGTH_LONG).show();
                 }
             });
         });
@@ -57,20 +56,6 @@ public class LoginFragment extends Fragment {
                             R.anim.fade_out
                     )
                     .replace(R.id.fragment_container, new RegisterFragment())
-                    .addToBackStack(null)
-                    .commit();
-        });
-
-        binding.goReset.setOnClickListener(v -> {
-            requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .setCustomAnimations(
-                            R.anim.slide_in,
-                            R.anim.slide_out,
-                            R.anim.fade_in,
-                            R.anim.fade_out
-                    )
-                    .replace(R.id.fragment_container, new ResetPasswordFragment())
                     .addToBackStack(null)
                     .commit();
         });

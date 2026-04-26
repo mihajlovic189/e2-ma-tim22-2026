@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel;
 
 import com.example.slagalicaapp.data.models.User;
 import com.example.slagalicaapp.repositories.AuthRepository;
+import com.google.firebase.auth.FirebaseUser;
 
 public class AuthViewModel extends ViewModel {
     private AuthRepository authRepository;
@@ -13,16 +14,15 @@ public class AuthViewModel extends ViewModel {
         authRepository = new AuthRepository();
     }
 
-    public LiveData<String> register(String email, String user, String reg, String pass) {
-        User newUser = new User(email, user, reg, pass);
-        return authRepository.registerUser(newUser);
+    public LiveData<String> register(User user) {
+        return authRepository.registerUser(user);
     }
 
-    public LiveData<User> login(String identity, String password) {
-        return authRepository.login(identity, password);
+    public LiveData<FirebaseUser> login(String email, String password) {
+        return authRepository.login(email, password);
     }
 
-    public LiveData<String> resetPassword(String token, String oldPass, String newPass) {
-        return authRepository.resetPassword(token, oldPass, newPass);
+    public LiveData<String> resetPassword(String oldPass, String newPass) {
+        return authRepository.changePassword(oldPass, newPass);
     }
 }

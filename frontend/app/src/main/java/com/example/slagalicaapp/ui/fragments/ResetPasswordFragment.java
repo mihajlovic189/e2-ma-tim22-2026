@@ -44,10 +44,9 @@ public class ResetPasswordFragment extends Fragment {
             String token = prefs.getString("jwt_token", null);
 
             if (token != null) {
-                viewModel.resetPassword(token, oldPass, newPass)
-                        .observe(getViewLifecycleOwner(), msg -> {
-                            Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-                        });
+                viewModel.resetPassword(oldPass, newPass).observe(getViewLifecycleOwner(), msg -> {
+                    Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                });
             } else {
                 Toast.makeText(getContext(), "Niste ulogovani (token fali)", Toast.LENGTH_SHORT).show();
             }
