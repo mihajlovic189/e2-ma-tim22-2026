@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "737923458475",
+    "project_id": "slagalica-mobilna-aplikacija",
+    "storage_bucket": "slagalica-mobilna-aplikacija.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:737923458475:android:4a8f816172823dfae29eee",
+        "android_client_info": {
+          "package_name": "com.example.slagalicaapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDILpvX26Oc25sta7PSluENKuElQcb3bmw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
