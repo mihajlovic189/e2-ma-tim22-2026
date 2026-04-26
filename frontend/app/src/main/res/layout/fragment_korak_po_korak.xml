@@ -1,0 +1,55 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:id="@+id/stepsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="20dp">
+
+        <TextView style="@style/StepStyle" android:id="@+id/step1" android:text="KORAK 1" />
+        <TextView style="@style/StepStyle" android:id="@+id/step2" android:text="KORAK 2" />
+        <TextView style="@style/StepStyle" android:id="@+id/step3" android:text="KORAK 3" />
+        <TextView style="@style/StepStyle" android:id="@+id/step4" android:text="KORAK 4" />
+        <TextView style="@style/StepStyle" android:id="@+id/step5" android:text="KORAK 5" />
+        <TextView style="@style/StepStyle" android:id="@+id/step6" android:text="KORAK 6" />
+        <TextView style="@style/StepStyle" android:id="@+id/step7" android:text="KORAK 7" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvTimer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="00:70"
+        android:textColor="@color/primary"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_gravity="center_horizontal"/>
+
+    <EditText
+        android:id="@+id/etKrajnjeResenje"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Unesite konačan pojam"
+        android:textColor="@color/text"
+        android:textColorHint="@color/hint"
+        android:background="@drawable/input_bg"
+        android:padding="16dp"
+        android:layout_marginTop="20dp"
+        android:gravity="center" />
+
+    <Button
+        android:id="@+id/btnPotvrdi"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Potvrdi"
+        android:textColor="@color/text"
+        android:backgroundTint="@color/primary"
+        android:layout_marginTop="16dp"/>
+
+</LinearLayout>

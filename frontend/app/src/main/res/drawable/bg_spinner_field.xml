@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape>
+            <solid android:color="#1E293B" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@android:drawable/arrow_down_float"
+        android:gravity="end|center_vertical"
+        android:right="16dp" />
+</layer-list>

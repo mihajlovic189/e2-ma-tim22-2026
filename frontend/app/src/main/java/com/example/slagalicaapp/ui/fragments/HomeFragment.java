@@ -22,6 +22,12 @@ public class HomeFragment extends Fragment {
                     .commit();
         });
 
+        binding.btnKorakPoKorak.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction().replace(R.id.fragment_container, new KorakPoKorakFragment()).addToBackStack(null).commit());
+
+        binding.btnMojBroj.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction().replace(R.id.fragment_container, new MojBrojFragment()).addToBackStack(null).commit());
+
         return binding.getRoot();
     }
 }
