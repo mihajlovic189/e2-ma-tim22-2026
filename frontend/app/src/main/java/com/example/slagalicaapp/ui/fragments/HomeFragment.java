@@ -15,6 +15,7 @@ public class HomeFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         binding = FragmentHomeBinding.inflate(inflater, container, false);
 
+        // Reset Lozinke
         binding.btnGoToReset.setOnClickListener(v -> {
             getParentFragmentManager().beginTransaction()
                     .replace(R.id.fragment_container, new ResetPasswordFragment())
@@ -22,11 +23,40 @@ public class HomeFragment extends Fragment {
                     .commit();
         });
 
+        // Igra: Korak po korak
         binding.btnKorakPoKorak.setOnClickListener(v ->
-                getParentFragmentManager().beginTransaction().replace(R.id.fragment_container, new KorakPoKorakFragment()).addToBackStack(null).commit());
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new KorakPoKorakFragment())
+                        .addToBackStack(null)
+                        .commit());
 
+        // Igra: Moj broj
         binding.btnMojBroj.setOnClickListener(v ->
-                getParentFragmentManager().beginTransaction().replace(R.id.fragment_container, new MojBrojFragment()).addToBackStack(null).commit());
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new MojBrojFragment())
+                        .addToBackStack(null)
+                        .commit());
+
+        // Igra: Asocijacije
+        binding.btnAsocijacija.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new AsocijacijeFragment())
+                        .addToBackStack(null)
+                        .commit());
+
+        // Igra: Skočko
+        binding.btnSkocko.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new SkockoFragment())
+                        .addToBackStack(null)
+                        .commit());
+
+        // Notifikacije
+        binding.btnNotifications.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new NotificationsFragment())
+                        .addToBackStack(null)
+                        .commit());
 
         return binding.getRoot();
     }
