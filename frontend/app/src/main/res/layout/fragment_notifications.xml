@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".ui.fragments.NotificationsFragment">
+
+    <!-- TABOVI NA VRHU -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="32dp">
+
+        <Button
+            android:id="@+id/btnTab1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Čet"
+            android:textSize="11sp"
+            android:backgroundTint="#2196F3"
+            android:textColor="#FFFFFF"/>
+        <Button
+            android:id="@+id/btnTab2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Rang"
+            android:textSize="11sp"
+            android:backgroundTint="#BBDEFB"
+            android:textColor="#000000"/>
+        <Button
+            android:id="@+id/btnTab3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Nagrada"
+            android:textSize="11sp"
+            android:backgroundTint="#BBDEFB"
+            android:textColor="#000000"/>
+        <Button
+            android:id="@+id/btnTab4"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Ostalo"
+            android:textSize="11sp"
+            android:backgroundTint="#BBDEFB"
+            android:textColor="#000000"/>
+    </LinearLayout>
+
+    <!-- FILTER DUGME -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <Button
+            android:id="@+id/btnFilter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sve"
+            android:textSize="12sp"
+            android:backgroundTint="#607D8B"
+            android:textColor="#FFFFFF"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"/>
+    </LinearLayout>
+
+    <!-- LISTE -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvLista1"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="visible"
+        tools:listitem="@android:layout/simple_list_item_1"/>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvLista2"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone"
+        tools:listitem="@android:layout/simple_list_item_1"/>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvLista3"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone"
+        tools:listitem="@android:layout/simple_list_item_1"/>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvLista4"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone"
+        tools:listitem="@android:layout/simple_list_item_1"/>
+
+</LinearLayout>

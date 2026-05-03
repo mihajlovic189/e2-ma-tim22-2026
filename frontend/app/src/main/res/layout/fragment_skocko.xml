@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1565C0"
+    android:paddingTop="42dp"
+    android:paddingBottom="42dp"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp"
+    tools:context=".ui.fragments.SkockoFragment">
+
+    <!-- GRID POKUŠAJA -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Red 1 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+
+            <ImageView android:id="@+id/r1c1"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9"
+                android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r1c2"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9"
+                android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r1c3"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9"
+                android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r1c4"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9"
+                android:scaleType="centerInside"/>
+
+            <!-- Indikatori desno -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:layout_marginStart="8dp"
+                android:gravity="center">
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp"
+                        android:background="@drawable/button_background"
+                        android:backgroundTint="#90CAF9"
+                        android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp"
+                        android:background="@drawable/button_background"
+                        android:backgroundTint="#90CAF9"
+                        android:layout_margin="2dp"/>
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp"
+                        android:background="@drawable/button_background"
+                        android:backgroundTint="#90CAF9"
+                        android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp"
+                        android:background="@drawable/button_background"
+                        android:backgroundTint="#90CAF9"
+                        android:layout_margin="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Red 2 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+            <ImageView android:id="@+id/r2c1"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r2c2"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r2c3"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r2c4"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:layout_marginStart="8dp"
+                android:gravity="center">
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Red 3 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+            <ImageView android:id="@+id/r3c1"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r3c2"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r3c3"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r3c4"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:layout_marginStart="8dp"
+                android:gravity="center">
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Red 4 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+            <ImageView android:id="@+id/r4c1"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r4c2"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r4c3"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r4c4"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:layout_marginStart="8dp"
+                android:gravity="center">
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Red 5 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+            <ImageView android:id="@+id/r5c1"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r5c2"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r5c3"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r5c4"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:layout_marginStart="8dp"
+                android:gravity="center">
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Red 6 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+            <ImageView android:id="@+id/r6c1"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r6c2"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r6c3"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <ImageView android:id="@+id/r6c4"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/button_background"
+                android:backgroundTint="#90CAF9" android:scaleType="centerInside"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:layout_marginStart="8dp"
+                android:gravity="center">
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/button_background" android:backgroundTint="#90CAF9" android:layout_margin="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- SEPARATOR -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#42A5F5"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- SIMBOLI ZA ODABIR -->
+    <!-- SIMBOLI ZA ODABIR -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.15"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <ImageButton android:id="@+id/btn_karo"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:layout_margin="5dp"
+            android:background="@drawable/button_background"
+            android:backgroundTint="#90CAF9"
+            android:src="@android:drawable/star_on"
+            android:scaleType="centerInside"
+            android:contentDescription="Karo"/>
+        <ImageButton android:id="@+id/btn_srce"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:layout_margin="5dp"
+            android:background="@drawable/button_background"
+            android:backgroundTint="#90CAF9"
+            android:src="@android:drawable/star_on"
+            android:scaleType="centerInside"
+            android:contentDescription="Srce"/>
+        <ImageButton android:id="@+id/btn_tref"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:layout_margin="5dp"
+            android:background="@drawable/button_background"
+            android:backgroundTint="#90CAF9"
+            android:src="@android:drawable/star_on"
+            android:scaleType="centerInside"
+            android:contentDescription="Tref"/>
+        <ImageButton android:id="@+id/btn_pik"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:layout_margin="5dp"
+            android:background="@drawable/button_background"
+            android:backgroundTint="#90CAF9"
+            android:src="@android:drawable/star_on"
+            android:scaleType="centerInside"
+            android:contentDescription="Pik"/>
+        <ImageButton android:id="@+id/btn_sova"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:layout_margin="5dp"
+            android:background="@drawable/button_background"
+            android:backgroundTint="#90CAF9"
+            android:src="@android:drawable/star_on"
+            android:scaleType="centerInside"
+            android:contentDescription="Sova"/>
+        <ImageButton android:id="@+id/btn_zvezda"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:layout_margin="5dp"
+            android:background="@drawable/button_background"
+            android:backgroundTint="#90CAF9"
+            android:src="@android:drawable/star_on"
+            android:scaleType="centerInside"
+            android:contentDescription="Zvezda"/>
+    </LinearLayout>
+
+</LinearLayout>
