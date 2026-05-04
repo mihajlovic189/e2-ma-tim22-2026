@@ -2,13 +2,16 @@ package com.example.slagalicaapp.repositories;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+import com.example.slagalicaapp.data.models.ProfileData;
 import com.example.slagalicaapp.data.models.User;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -48,6 +51,16 @@ public class AuthRepository {
                             userData.put("region", user.getRegion());
                             userData.put("email", user.getEmail());
                             userData.put("uid", fUser.getUid());
+                            userData.put("avatarUri", "");
+                            userData.put("leagueName", "Bronzana liga");
+                            userData.put("qrPayload", buildQrPayload(fUser.getUid(), user.getUsername()));
+                            userData.put("tokenCount", 0);
+                            userData.put("totalStars", 0);
+                            userData.put("totalGamesPlayed", 0);
+                            userData.put("wins", 0);
+                            userData.put("losses", 0);
+                            userData.put("averageScoreRanges", buildDefaultAverageScoreRanges());
+                            userData.put("detailedStats", buildDefaultDetailedStats());
 
                             db.collection("users").document(fUser.getUid())
                                     .set(userData);
@@ -79,6 +92,47 @@ public class AuthRepository {
                     });
         }
         return userLiveData;
+    }
+
+    public LiveData<ProfileData> loadCurrentUserProfile() {
+        MutableLiveData<ProfileData> result = new MutableLiveData<>();
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+
+        if (currentUser == null) {
+            result.setValue(null);
+            return result;
+        }
+
+        db.collection("users").document(currentUser.getUid())
+                .get()
+                .addOnSuccessListener(documentSnapshot -> result.setValue(mapProfile(currentUser, documentSnapshot)))
+                .addOnFailureListener(e -> result.setValue(null));
+
+        return result;
+    }
+
+    public LiveData<String> updateAvatarUri(String avatarUri) {
+        MutableLiveData<String> result = new MutableLiveData<>();
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+
+        if (currentUser == null) {
+            result.setValue("Niste prijavljeni.");
+            return result;
+        }
+
+        Map<String, Object> update = new HashMap<>();
+        update.put("avatarUri", avatarUri);
+
+        db.collection("users").document(currentUser.getUid())
+                .update(update)
+                .addOnSuccessListener(unused -> result.setValue("Avatar je uspešno ažuriran."))
+                .addOnFailureListener(e -> result.setValue("Neuspešno ažuriranje avatara."));
+
+        return result;
+    }
+
+    public void logout() {
+        mAuth.signOut();
     }
 
     private void performFirebaseLogin(String email, String password, MutableLiveData<FirebaseUser> liveData) {
@@ -119,5 +173,86 @@ public class AuthRepository {
             });
         }
         return result;
+    }
+
+    private ProfileData mapProfile(FirebaseUser currentUser, DocumentSnapshot documentSnapshot) {
+        ProfileData profileData = new ProfileData();
+        profileData.setUid(currentUser.getUid());
+        profileData.setUsername(stringValue(documentSnapshot.getString("username"), "Igrač"));
+        profileData.setEmail(stringValue(documentSnapshot.getString("email"), currentUser.getEmail()));
+        profileData.setRegion(stringValue(documentSnapshot.getString("region"), "Nepoznat region"));
+        profileData.setAvatarUri(stringValue(documentSnapshot.getString("avatarUri"), ""));
+        profileData.setLeagueName(stringValue(documentSnapshot.getString("leagueName"), "Bronzana liga"));
+        profileData.setQrPayload(stringValue(documentSnapshot.getString("qrPayload"), buildQrPayload(currentUser.getUid(), profileData.getUsername())));
+        profileData.setTokenCount(readInt(documentSnapshot.get("tokenCount"), 0));
+        profileData.setTotalStars(readInt(documentSnapshot.get("totalStars"), 0));
+        profileData.setTotalGamesPlayed(readInt(documentSnapshot.get("totalGamesPlayed"), 0));
+        profileData.setWins(readInt(documentSnapshot.get("wins"), 0));
+        profileData.setLosses(readInt(documentSnapshot.get("losses"), 0));
+        profileData.setAverageScoreRanges(readMap(documentSnapshot.get("averageScoreRanges"), buildDefaultAverageScoreRanges()));
+        profileData.setDetailedStats(readMap(documentSnapshot.get("detailedStats"), buildDefaultDetailedStats()));
+        return profileData;
+    }
+
+    private String stringValue(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value;
+    }
+
+    private int readInt(Object value, int fallback) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+
+        if (value instanceof String) {
+            try {
+                return Integer.parseInt((String) value);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+
+        return fallback;
+    }
+
+    private Map<String, String> readMap(Object value, Map<String, String> fallback) {
+        if (value instanceof Map<?, ?>) {
+            Map<String, String> result = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null) {
+                    result.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+                }
+            }
+            return result.isEmpty() ? new LinkedHashMap<>(fallback) : result;
+        }
+
+        return new LinkedHashMap<>(fallback);
+    }
+
+    private Map<String, String> buildDefaultAverageScoreRanges() {
+        Map<String, String> ranges = new LinkedHashMap<>();
+        ranges.put("Ko zna zna", "20–50 poena");
+        ranges.put("Moj broj", "10–30 poena");
+        ranges.put("Korak po korak", "15–40 poena");
+        ranges.put("Asocijacije", "25–60 poena");
+        ranges.put("Skočko", "10–25 poena");
+        ranges.put("Spojnice", "15–35 poena");
+        return ranges;
+    }
+
+    private Map<String, String> buildDefaultDetailedStats() {
+        Map<String, String> stats = new LinkedHashMap<>();
+        stats.put("Ko zna zna", "Pogođeno 68% / promašeno 32%");
+        stats.put("Moj broj", "Tačan broj pronađen u 54% partija");
+        stats.put("Korak po korak", "Korak 1: 81%, Korak 2: 74%, Korak 3: 69%");
+        stats.put("Asocijacije", "Rešene 46% / nerešene 54%");
+        stats.put("Skočko", "Kombinacija pogođena u 38% pokušaja");
+        stats.put("Spojnice", "Povezano 72% pojmova");
+        stats.put("Ukupno odigranih partija", "128");
+        stats.put("Pobeđene / izgubljene partije", "61% / 39%");
+        return stats;
+    }
+
+    private String buildQrPayload(String uid, String username) {
+        return "slagalica://invite?uid=" + uid + "&username=" + username;
     }
 }

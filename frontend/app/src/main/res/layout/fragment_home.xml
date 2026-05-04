@@ -1,6 +1,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/bg">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -14,14 +16,26 @@
             android:layout_height="wrap_content"
             android:text="Dobrodošli u Slagalicu!"
             android:textSize="24sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:textColor="@color/text" />
+
+        <Button
+            android:id="@+id/btnProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Moj profil"
+            android:textColor="@color/text"
+            android:backgroundTint="@color/primary" />
 
         <Button
             android:id="@+id/btnGoToReset"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
-            android:text="Promeni Lozinku" />
+            android:layout_marginTop="10dp"
+            android:text="Promeni lozinku"
+            android:textColor="@color/text"
+            android:backgroundTint="#334155" />
 
         <Button
             android:id="@+id/btnKorakPoKorak"
@@ -29,6 +43,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:text="Igra: Korak po korak"
+            android:textColor="@color/text"
             android:backgroundTint="#4CAF50" />
 
         <Button
@@ -37,6 +52,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:text="Igra: Moj broj"
+            android:textColor="@color/text"
             android:backgroundTint="#FF9800" />
 
         <Button
@@ -45,6 +61,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:text="Igra: Asocijacija"
+            android:textColor="@color/text"
             android:backgroundTint="#2196F3" />
 
         <Button
@@ -53,6 +70,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:text="Igra: Skočko"
+            android:textColor="@color/text"
             android:backgroundTint="#9C27B0" />
 
     </LinearLayout>
@@ -66,6 +84,7 @@
         android:layout_marginEnd="12dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@android:drawable/ic_popup_reminder"
-        android:tint="#FFFFFF"
+        app:tint="#FFFFFF"
         android:contentDescription="Notifikacije" />
 </FrameLayout>
+
