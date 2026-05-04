@@ -3,21 +3,34 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="20dp">
+    android:padding="20dp"
+    android:background="@color/bg">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Dobrodošli u Slagalicu!"
         android:textSize="24sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:textColor="@color/text" />
+
+    <Button
+        android:id="@+id/btnProfile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="Moj profil"
+        android:textColor="@color/text"
+        android:backgroundTint="@color/primary" />
 
     <Button
         android:id="@+id/btnGoToReset"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="30dp"
-        android:text="Promeni Lozinku" />
+        android:text="Promeni lozinku"
+        android:textColor="@color/text"
+        android:backgroundTint="#334155" />
 
     <Button
         android:id="@+id/btnKorakPoKorak"
@@ -25,6 +38,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:text="Igra: Korak po korak"
+        android:textColor="@color/text"
         android:backgroundTint="#4CAF50" />
 
     <Button
@@ -33,5 +47,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:text="Igra: Moj broj"
+        android:textColor="@color/text"
         android:backgroundTint="#FF9800" />
 </LinearLayout>

@@ -5,8 +5,10 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.content.Context;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -20,7 +22,7 @@ public class LoginFragment extends Fragment {
     private AuthViewModel viewModel;
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         binding = FragmentLoginBinding.inflate(inflater, container, false);
         viewModel = new ViewModelProvider(this).get(AuthViewModel.class);
 
@@ -37,6 +39,11 @@ public class LoginFragment extends Fragment {
                 if (user != null) {
                     Toast.makeText(getContext(), "Login uspešan!", Toast.LENGTH_SHORT).show();
 
+                    requireActivity().getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+                            .edit()
+                            .putString("jwt_token", user.getUid())
+                            .apply();
+
                     getParentFragmentManager().beginTransaction()
                             .replace(R.id.fragment_container, new HomeFragment())
                             .commit();
@@ -46,20 +53,24 @@ public class LoginFragment extends Fragment {
             });
         });
 
-        binding.goRegister.setOnClickListener(v -> {
-            requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .setCustomAnimations(
-                            R.anim.slide_in,
-                            R.anim.slide_out,
-                            R.anim.fade_in,
-                            R.anim.fade_out
-                    )
-                    .replace(R.id.fragment_container, new RegisterFragment())
-                    .addToBackStack(null)
-                    .commit();
-        });
+        binding.goRegister.setOnClickListener(v -> requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .setCustomAnimations(
+                        R.anim.slide_in,
+                        R.anim.slide_out,
+                        R.anim.fade_in,
+                        R.anim.fade_out
+                )
+                .replace(R.id.fragment_container, new RegisterFragment())
+                .addToBackStack(null)
+                .commit());
 
         return binding.getRoot();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
     }
 }

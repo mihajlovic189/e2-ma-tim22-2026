@@ -15,6 +15,13 @@ public class HomeFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         binding = FragmentHomeBinding.inflate(inflater, container, false);
 
+        binding.btnProfile.setOnClickListener(v -> {
+            getParentFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, new ProfileFragment())
+                    .addToBackStack(null)
+                    .commit();
+        });
+
         binding.btnGoToReset.setOnClickListener(v -> {
             getParentFragmentManager().beginTransaction()
                     .replace(R.id.fragment_container, new ResetPasswordFragment())
@@ -29,5 +36,11 @@ public class HomeFragment extends Fragment {
                 getParentFragmentManager().beginTransaction().replace(R.id.fragment_container, new MojBrojFragment()).addToBackStack(null).commit());
 
         return binding.getRoot();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
     }
 }
