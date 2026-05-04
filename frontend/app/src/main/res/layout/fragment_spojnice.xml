@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/bg"
+    tools:context=".ui.fragments.SpojniceFragment">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/input_bg"
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Spojnice"
+                android:textColor="@color/text"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="2 runde • 30 sekundi po rundi • 5 pojmova po rundi"
+                android:textColor="@color/hint"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Runda 1 / 2"
+                android:textColor="@color/primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/input_bg"
+            android:padding="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Igrač koji počinje rundu: Igrač 1"
+                android:textColor="@color/text"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Ako ostanu nepovezani pojmovi, drugi igrač ima dodatnih 30 sekundi da ih spoji."
+                android:textColor="@color/hint"
+                android:textSize="13sp" />
+
+            <ProgressBar
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="12dp"
+                android:max="30"
+                android:progress="18"
+                android:progressTint="@color/primary"
+                android:progressBackgroundTint="#334155" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/input_bg"
+            android:padding="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Runda 1"
+                android:textColor="@color/text"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Primer: izvođači i nazivi pesama"
+                android:textColor="@color/hint"
+                android:textSize="13sp" />
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="horizontal">
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Miroslav Ilić" android:textAllCaps="false" android:textColor="@color/text" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginHorizontal="8dp" android:text="↔" android:textColor="@color/primary" android:textSize="20sp" android:gravity="center_vertical" />
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Zašto su dani tužni" android:textAllCaps="false" android:textColor="@color/text" />
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Bajaga" android:textAllCaps="false" android:textColor="@color/text" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginHorizontal="8dp" android:text="↔" android:textColor="@color/primary" android:textSize="20sp" />
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="442 do Beograda" android:textAllCaps="false" android:textColor="@color/text" />
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Dino Merlin" android:textAllCaps="false" android:textColor="@color/text" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginHorizontal="8dp" android:text="↔" android:textColor="@color/primary" android:textSize="20sp" />
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Kad zamirišu jorgovani" android:textAllCaps="false" android:textColor="@color/text" />
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Bijelo Dugme" android:textAllCaps="false" android:textColor="@color/text" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginHorizontal="8dp" android:text="↔" android:textColor="@color/primary" android:textSize="20sp" />
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Lipe cvatu" android:textAllCaps="false" android:textColor="@color/text" />
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Tozovac" android:textAllCaps="false" android:textColor="@color/text" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginHorizontal="8dp" android:text="↔" android:textColor="@color/primary" android:textSize="20sp" />
+                <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/button_background" android:text="Niz polja se proteže" android:textAllCaps="false" android:textColor="@color/text" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
+
+
+

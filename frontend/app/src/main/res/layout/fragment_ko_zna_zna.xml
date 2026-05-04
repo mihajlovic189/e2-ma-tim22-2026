@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:fillViewport="true"
+	android:background="@color/bg"
+	tools:context=".ui.fragments.KoZnaZnaFragment">
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="vertical"
+		android:padding="20dp">
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical"
+			android:background="@drawable/input_bg"
+			android:padding="18dp">
+
+			<TextView
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="Ko zna zna"
+				android:textColor="@color/text"
+				android:textSize="26sp"
+				android:textStyle="bold" />
+
+			<TextView
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="6dp"
+				android:text="1 runda • 5 pitanja • 25 sekundi po rundi"
+				android:textColor="@color/hint"
+				android:textSize="14sp" />
+		</LinearLayout>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="16dp"
+			android:orientation="horizontal">
+
+			<LinearLayout
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:layout_marginEnd="8dp"
+				android:background="@drawable/input_bg"
+				android:padding="16dp"
+				android:orientation="vertical">
+
+				<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Igrač 1" android:textColor="@color/hint" />
+				<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="@color/text" android:textSize="30sp" android:textStyle="bold" />
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:layout_marginStart="8dp"
+				android:background="@drawable/input_bg"
+				android:padding="16dp"
+				android:orientation="vertical">
+
+				<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Igrač 2" android:textColor="@color/hint" />
+				<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="@color/text" android:textSize="30sp" android:textStyle="bold" />
+			</LinearLayout>
+		</LinearLayout>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="16dp"
+			android:background="@drawable/input_bg"
+			android:padding="16dp"
+			android:orientation="vertical">
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:gravity="center_vertical">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="1"
+					android:text="Pitanje 1/5"
+					android:textColor="@color/text"
+					android:textSize="18sp"
+					android:textStyle="bold" />
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:text="00:25"
+					android:textColor="@color/primary"
+					android:textSize="20sp"
+					android:textStyle="bold" />
+			</LinearLayout>
+
+			<ProgressBar
+				style="@android:style/Widget.ProgressBar.Horizontal"
+				android:layout_width="match_parent"
+				android:layout_height="8dp"
+				android:layout_marginTop="12dp"
+				android:max="25"
+				android:progress="20"
+				android:progressTint="@color/primary"
+				android:progressBackgroundTint="#334155" />
+		</LinearLayout>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="16dp"
+			android:background="@drawable/input_bg"
+			android:padding="18dp"
+			android:orientation="vertical">
+
+			<TextView
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="Koji je glavni grad Srbije?"
+				android:textColor="@color/text"
+				android:textSize="20sp"
+				android:textStyle="bold" />
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:text="Za svako pitanje igrač ima 5 sekundi, a tačan odgovor nosi 10 poena."
+				android:textColor="@color/hint"
+				android:textSize="13sp" />
+		</LinearLayout>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="16dp"
+			android:orientation="vertical">
+
+			<Button android:id="@+id/btnAnswerA" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/button_background" android:text="A. Beograd" android:textAllCaps="false" android:textColor="@color/text" />
+			<Button android:id="@+id/btnAnswerB" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/button_background" android:text="B. Novi Sad" android:textAllCaps="false" android:textColor="@color/text" />
+			<Button android:id="@+id/btnAnswerC" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/button_background" android:text="C. Niš" android:textAllCaps="false" android:textColor="@color/text" />
+			<Button android:id="@+id/btnAnswerD" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/button_background" android:text="D. Kragujevac" android:textAllCaps="false" android:textColor="@color/text" />
+        </LinearLayout>
+
+	</LinearLayout>
+</ScrollView>
+
+
