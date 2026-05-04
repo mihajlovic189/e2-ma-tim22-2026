@@ -1,52 +1,90 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="20dp"
     android:background="@color/bg">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Dobrodošli u Slagalicu!"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="@color/text" />
-
-    <Button
-        android:id="@+id/btnProfile"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:text="Moj profil"
-        android:textColor="@color/text"
-        android:backgroundTint="@color/primary" />
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="20dp">
 
-    <Button
-        android:id="@+id/btnGoToReset"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dobrodošli u Slagalicu!"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/text" />
+
+        <Button
+            android:id="@+id/btnProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Moj profil"
+            android:textColor="@color/text"
+            android:backgroundTint="@color/primary" />
+
+        <Button
+            android:id="@+id/btnGoToReset"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Promeni lozinku"
+            android:textColor="@color/text"
+            android:backgroundTint="#334155" />
+
+        <Button
+            android:id="@+id/btnKorakPoKorak"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Igra: Korak po korak"
+            android:textColor="@color/text"
+            android:backgroundTint="#4CAF50" />
+
+        <Button
+            android:id="@+id/btnMojBroj"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Igra: Moj broj"
+            android:textColor="@color/text"
+            android:backgroundTint="#FF9800" />
+
+        <Button
+            android:id="@+id/btnAsocijacija"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Igra: Asocijacija"
+            android:textColor="@color/text"
+            android:backgroundTint="#2196F3" />
+
+        <Button
+            android:id="@+id/btnSkocko"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Igra: Skočko"
+            android:textColor="@color/text"
+            android:backgroundTint="#9C27B0" />
+
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/btnNotifications"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
         android:layout_marginTop="30dp"
-        android:text="Promeni lozinku"
-        android:textColor="@color/text"
-        android:backgroundTint="#334155" />
+        android:layout_marginEnd="12dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_popup_reminder"
+        app:tint="#FFFFFF"
+        android:contentDescription="Notifikacije" />
+</FrameLayout>
 
-    <Button
-        android:id="@+id/btnKorakPoKorak"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="Igra: Korak po korak"
-        android:textColor="@color/text"
-        android:backgroundTint="#4CAF50" />
-
-    <Button
-        android:id="@+id/btnMojBroj"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="Igra: Moj broj"
-        android:textColor="@color/text"
-        android:backgroundTint="#FF9800" />
-</LinearLayout>
