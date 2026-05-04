@@ -16,19 +16,17 @@ public class HomeFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         binding = FragmentHomeBinding.inflate(inflater, container, false);
 
-        binding.btnProfile.setOnClickListener(v -> {
-            getParentFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, new ProfileFragment())
-                    .addToBackStack(null)
-                    .commit();
-        });
+        binding.btnProfile.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new ProfileFragment())
+                        .addToBackStack(null)
+                        .commit());
 
-        binding.btnGoToReset.setOnClickListener(v -> {
-            getParentFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, new ResetPasswordFragment())
-                    .addToBackStack(null)
-                    .commit();
-        });
+        binding.btnGoToReset.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new ResetPasswordFragment())
+                        .addToBackStack(null)
+                        .commit());
 
         // Igra: Korak po korak
         binding.btnKorakPoKorak.setOnClickListener(v ->
@@ -57,6 +55,26 @@ public class HomeFragment extends Fragment {
                         .replace(R.id.fragment_container, new SkockoFragment())
                         .addToBackStack(null)
                         .commit());
+
+        // Igra: Ko zna zna
+        View koZnaZnaButton = binding.getRoot().findViewById(R.id.btnKoZnaZna);
+        if (koZnaZnaButton != null) {
+            koZnaZnaButton.setOnClickListener(v ->
+                    getParentFragmentManager().beginTransaction()
+                            .replace(R.id.fragment_container, new KoZnaZnaFragment())
+                            .addToBackStack(null)
+                            .commit());
+        }
+
+        // Igra: Spojnice
+        View spojniceButton = binding.getRoot().findViewById(R.id.btnSpojnice);
+        if (spojniceButton != null) {
+            spojniceButton.setOnClickListener(v ->
+                    getParentFragmentManager().beginTransaction()
+                            .replace(R.id.fragment_container, new SpojniceFragment())
+                            .addToBackStack(null)
+                            .commit());
+        }
 
         // Notifikacije
         binding.btnNotifications.setOnClickListener(v ->
