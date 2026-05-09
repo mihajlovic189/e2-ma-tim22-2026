@@ -1,0 +1,76 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- zraci -->
+    <path
+        android:fillColor="#FF9800"
+        android:strokeColor="#E65100"
+        android:strokeWidth="1.2"
+        android:pathData="M24,2 C27,8 21,8 24,2 Z
+                          M24,46 C21,40 27,40 24,46 Z
+                          M2,24 C8,21 8,27 2,24 Z
+                          M46,24 C40,27 40,21 46,24 Z
+                          M8,8 C14,10 10,14 8,8 Z
+                          M40,8 C38,14 34,10 40,8 Z
+                          M8,40 C10,34 14,38 8,40 Z
+                          M40,40 C34,38 38,34 40,40 Z" />
+
+    <!-- krug sunca -->
+    <path
+        android:fillColor="#FFD54F"
+        android:strokeColor="#F57C00"
+        android:strokeWidth="2"
+        android:pathData="M24,10
+                          A14,14 0,1 1,23.9 10" />
+
+    <!-- oči -->
+    <path
+        android:fillColor="#4E2600"
+        android:pathData="M18,21
+                          A2.2,3 0,1 1,17.9 21" />
+
+    <path
+        android:fillColor="#4E2600"
+        android:pathData="M30,21
+                          A2.2,3 0,1 1,29.9 21" />
+
+    <!-- sjaj u očima -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17.2,19.8
+                          A0.8,0.8 0,1 1,17.1 19.8" />
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M29.2,19.8
+                          A0.8,0.8 0,1 1,29.1 19.8" />
+
+    <!-- obrazi -->
+    <path
+        android:fillColor="#FF7043"
+        android:pathData="M14,28
+                          A2.3,1.8 0,1 1,13.9 28" />
+
+    <path
+        android:fillColor="#FF7043"
+        android:pathData="M34,28
+                          A2.3,1.8 0,1 1,33.9 28" />
+
+    <!-- osmeh -->
+    <path
+        android:fillColor="#5D1A00"
+        android:pathData="M18,29
+                          C20,35 28,35 30,29
+                          C28,31 20,31 18,29 Z" />
+
+    <!-- unutrašnjost usta -->
+    <path
+        android:fillColor="#FF7043"
+        android:pathData="M21,33
+                          C23,34.5 25,34.5 27,33
+                          C25,32.3 23,32.3 21,33 Z" />
+
+</vector>
