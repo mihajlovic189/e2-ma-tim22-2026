@@ -23,6 +23,10 @@ public class AuthViewModel extends ViewModel {
         return authRepository.login(email, password);
     }
 
+    public LiveData<String> loginGuest(String username, String region) {
+        return authRepository.loginGuest(username, region);
+    }
+
     public LiveData<ProfileData> loadProfile() {
         return authRepository.loadCurrentUserProfile();
     }

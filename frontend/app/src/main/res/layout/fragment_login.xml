@@ -12,55 +12,64 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Prijavi se"
-                android:textSize="26sp"
-                android:textColor="@color/text"
-                android:textStyle="bold"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginBottom="24dp"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="24dp"
+            android:text="Prijavi se"
+            android:textColor="@color/text"
+            android:textSize="26sp"
+            android:textStyle="bold" />
 
-            <EditText
-                android:id="@+id/etIdentity"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Email ili username"
-                android:textColor="@color/text"
-                android:textColorHint="@color/hint"
-                android:background="@drawable/input_bg"
-                android:padding="16dp"/>
+        <EditText
+            android:id="@+id/etIdentity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/input_bg"
+            android:hint="Email ili username"
+            android:padding="16dp"
+            android:textColor="@color/text"
+            android:textColorHint="@color/hint" />
 
-            <EditText
-                android:id="@+id/etPassword"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Lozinka"
-                android:inputType="textPassword"
-                android:textColor="@color/text"
-                android:textColorHint="@color/hint"
-                android:background="@drawable/input_bg"
-                android:padding="16dp"
-                android:layout_marginTop="12dp"/>
+        <EditText
+            android:id="@+id/etPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/input_bg"
+            android:hint="Lozinka"
+            android:inputType="textPassword"
+            android:padding="16dp"
+            android:textColor="@color/text"
+            android:textColorHint="@color/hint" />
 
-            <Button
-                android:id="@+id/btnLogin"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Prijavi se"
-                android:textColor="@color/text"
-                android:backgroundTint="@color/primary"
-                android:layout_marginTop="20dp"/>
+        <Button
+            android:id="@+id/btnLogin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="@color/primary"
+            android:text="Prijavi se"
+            android:textColor="@color/text" />
 
-            <TextView
-                android:id="@+id/goRegister"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Nemaš nalog? Registruj se"
-                android:textColor="@color/hint"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="16dp"/>
+        <TextView
+            android:id="@+id/goRegister"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="26dp"
+            android:text="Nemaš nalog? Registruj se"
+            android:textColor="@color/hint" />
+
+        <TextView
+            android:id="@+id/goGuest"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="26dp"
+            android:text="Igraj kao gost"
+            android:textColor="@color/hint" />
 
     </LinearLayout>
 

@@ -6,12 +6,16 @@ public class User {
     private String region;
     private String password;
     private String token;
+    private Boolean isGuest;
 
-    public User(String email, String username, String region, String password) {
+    public User(){}
+
+    public User(String email, String username, String region, String password, Boolean isGuest) {
         this.email = email;
         this.username = username;
         this.region = region;
         this.password = password;
+        this.isGuest = isGuest;
     }
 
     public String getEmail() {
@@ -29,6 +33,10 @@ public class User {
     public String getPassword() {
         return password;
     }
+
+    public Boolean getGuest() { return isGuest; }
+
+    public void setGuest(Boolean guest) { isGuest = guest; }
 
     public void setEmail(String email) {
         this.email = email;

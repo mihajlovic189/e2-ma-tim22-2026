@@ -5,6 +5,10 @@
     android:padding="24dp"
     android:background="@color/bg">
 
+    <include
+        android:id="@+id/gameStatus"
+        layout="@layout/layout_game_score_timer" />
+
     <LinearLayout
         android:id="@+id/stepsContainer"
         android:layout_width="match_parent"
@@ -20,16 +24,6 @@
         <TextView style="@style/StepStyle" android:id="@+id/step6" android:text="KORAK 6" />
         <TextView style="@style/StepStyle" android:id="@+id/step7" android:text="KORAK 7" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvTimer"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="00:70"
-        android:textColor="@color/primary"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_gravity="center_horizontal"/>
 
     <EditText
         android:id="@+id/etKrajnjeResenje"

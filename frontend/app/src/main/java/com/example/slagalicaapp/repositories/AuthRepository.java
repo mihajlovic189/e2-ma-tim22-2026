@@ -38,6 +38,72 @@ public class AuthRepository {
         return result;
     }
 
+    public LiveData<String> registerGuestUser(User user) {
+        MutableLiveData<String> result = new MutableLiveData<>();
+
+        mAuth.signInAnonymously().addOnCompleteListener(authTask -> {
+            if (authTask.isSuccessful() && mAuth.getCurrentUser() != null) {
+                String uid = mAuth.getCurrentUser().getUid();
+
+                db.collection("users").document(uid).get().addOnCompleteListener(dbTask -> {
+                    if (dbTask.isSuccessful() && dbTask.getResult().exists()) {
+                        result.setValue("GUEST_SUCCESS");
+                    } else {
+                        checkUsernameAndCreateGuest(user, uid, result);
+                    }
+                });
+            } else {
+                result.setValue("Greška pri anonimnoj prijavi.");
+            }
+        });
+
+        return result;
+    }
+
+    private void checkUsernameAndCreateGuest(User user, String uid, MutableLiveData<String> result) {
+        db.collection("users")
+                .whereEqualTo("username", user.getUsername())
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && !task.getResult().isEmpty()) {
+                        String newName = user.getUsername() + (int)(Math.random() * 100);
+                        user.setUsername(newName);
+                    }
+                    saveUserToFirestore(user, uid, true, result);
+                });
+    }
+
+    private void saveUserToFirestore(User user, String uid, boolean isGuest, MutableLiveData<String> result) {
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("uid", uid);
+        userData.put("username", user.getUsername());
+        userData.put("region", user.getRegion());
+        userData.put("isGuest", isGuest);
+        String email = isGuest ? ("guest_" + uid + "@slagalica.app") : user.getEmail();
+        userData.put("email", email);
+        userData.put("avatarUri", "");
+        userData.put("tokenCount", 0);
+        userData.put("totalStars", 0);
+        userData.put("totalGamesPlayed", 0);
+        userData.put("wins", 0);
+        userData.put("losses", 0);
+        userData.put("qrPayload", buildQrPayload(uid, user.getUsername()));
+        userData.put("averageScoreRanges", buildDefaultAverageScoreRanges());
+        userData.put("detailedStats", buildDefaultDetailedStats());
+        userData.put("leagueName", isGuest ? "Nema lige" : "Bronzana liga");
+
+        db.collection("users").document(uid)
+                .set(userData)
+                .addOnSuccessListener(aVoid -> {
+                    if (isGuest) {
+                        result.setValue("GUEST_SUCCESS");
+                    } else {
+                        result.setValue("Registracija uspešna. Potvrdite mejl!");
+                    }
+                })
+                .addOnFailureListener(e -> result.setValue("Greška pri upisu u bazu."));
+    }
+
     private void proceedWithAuthRegistration(User user, MutableLiveData<String> result) {
         mAuth.createUserWithEmailAndPassword(user.getEmail(), user.getPassword())
                 .addOnCompleteListener(task -> {
@@ -45,27 +111,7 @@ public class AuthRepository {
                         FirebaseUser fUser = mAuth.getCurrentUser();
                         if (fUser != null) {
                             fUser.sendEmailVerification();
-
-                            Map<String, Object> userData = new HashMap<>();
-                            userData.put("username", user.getUsername());
-                            userData.put("region", user.getRegion());
-                            userData.put("email", user.getEmail());
-                            userData.put("uid", fUser.getUid());
-                            userData.put("avatarUri", "");
-                            userData.put("leagueName", "Bronzana liga");
-                            userData.put("qrPayload", buildQrPayload(fUser.getUid(), user.getUsername()));
-                            userData.put("tokenCount", 0);
-                            userData.put("totalStars", 0);
-                            userData.put("totalGamesPlayed", 0);
-                            userData.put("wins", 0);
-                            userData.put("losses", 0);
-                            userData.put("averageScoreRanges", buildDefaultAverageScoreRanges());
-                            userData.put("detailedStats", buildDefaultDetailedStats());
-
-                            db.collection("users").document(fUser.getUid())
-                                    .set(userData);
-
-                            result.setValue("Registracija uspešna. Potvrdite mejl!");
+                            saveUserToFirestore(user, fUser.getUid(), false, result);
                         }
                     } else {
                         result.setValue("Greška: " + task.getException().getMessage());
@@ -92,6 +138,15 @@ public class AuthRepository {
                     });
         }
         return userLiveData;
+    }
+
+    public LiveData<String> loginGuest(String guestName, String region) {
+        User guestUser = new User();
+        guestUser.setUsername(guestName);
+        guestUser.setRegion(region);
+        guestUser.setGuest(true);
+
+        return registerGuestUser(guestUser);
     }
 
     public LiveData<ProfileData> loadCurrentUserProfile() {
