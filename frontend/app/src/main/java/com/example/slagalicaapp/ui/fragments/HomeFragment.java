@@ -6,8 +6,11 @@ import android.view.View;
 import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.databinding.FragmentHomeBinding;
+import com.example.slagalicaapp.viewmodels.AuthViewModel;
 
 public class HomeFragment extends Fragment {
     private FragmentHomeBinding binding;
@@ -15,6 +18,15 @@ public class HomeFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         binding = FragmentHomeBinding.inflate(inflater, container, false);
+        AuthViewModel authViewModel = new ViewModelProvider(this).get(AuthViewModel.class);
+
+        authViewModel.loadProfile().observe(getViewLifecycleOwner(), profile -> {
+            if (profile != null) {
+                binding.headerStats.tvTokens.setText(String.valueOf(profile.getTokenCount()));
+                binding.headerStats.tvStars.setText(String.valueOf(profile.getTotalStars()));
+                binding.headerStats.tvLeague.setText(profile.getLeagueName());
+            }
+        });
 
         binding.btnProfile.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
@@ -22,41 +34,30 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
-        binding.btnGoToReset.setOnClickListener(v ->
-                getParentFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, new ResetPasswordFragment())
-                        .addToBackStack(null)
-                        .commit());
-
-        // Igra: Korak po korak
         binding.btnKorakPoKorak.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new KorakPoKorakFragment())
                         .addToBackStack(null)
                         .commit());
 
-        // Igra: Moj broj
         binding.btnMojBroj.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new MojBrojFragment())
                         .addToBackStack(null)
                         .commit());
 
-        // Igra: Asocijacije
         binding.btnAsocijacija.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new AsocijacijeFragment())
                         .addToBackStack(null)
                         .commit());
 
-        // Igra: Skočko
         binding.btnSkocko.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new SkockoFragment())
                         .addToBackStack(null)
                         .commit());
 
-        // Igra: Ko zna zna
         View koZnaZnaButton = binding.getRoot().findViewById(R.id.btnKoZnaZna);
         if (koZnaZnaButton != null) {
             koZnaZnaButton.setOnClickListener(v ->
@@ -66,7 +67,6 @@ public class HomeFragment extends Fragment {
                             .commit());
         }
 
-        // Igra: Spojnice
         View spojniceButton = binding.getRoot().findViewById(R.id.btnSpojnice);
         if (spojniceButton != null) {
             spojniceButton.setOnClickListener(v ->
@@ -76,7 +76,6 @@ public class HomeFragment extends Fragment {
                             .commit());
         }
 
-        // Notifikacije
         binding.btnNotifications.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new NotificationsFragment())

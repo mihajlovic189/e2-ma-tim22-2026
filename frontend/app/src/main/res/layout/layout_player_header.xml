@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/playerHeader"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/input_bg"
+    android:orientation="horizontal"
+    android:padding="12dp"
+    android:layout_margin="30dp"
+    android:elevation="4dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tokeni" android:textColor="@color/hint" android:textSize="12sp" />
+        <TextView android:id="@+id/tvTokens" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="@color/text" android:textStyle="bold" android:textSize="16sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Zvezdice" android:textColor="@color/hint" android:textSize="12sp" />
+        <TextView android:id="@+id/tvStars" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="@color/text" android:textStyle="bold" android:textSize="16sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Liga" android:textColor="@color/hint" android:textSize="12sp" />
+        <TextView android:id="@+id/tvLeague" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Bronzana" android:textColor="@color/text" android:textStyle="bold" android:textSize="16sp" />
+    </LinearLayout>
+
+</LinearLayout>

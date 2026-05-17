@@ -64,6 +64,12 @@ public class ProfileFragment extends Fragment {
         binding.btnChangeAvatar.setOnClickListener(v -> avatarPickerLauncher.launch("image/*"));
         binding.btnLogout.setOnClickListener(v -> performLogout());
 
+        binding.btnGoToReset.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new ResetPasswordFragment())
+                        .addToBackStack(null)
+                        .commit());
+
         loadProfile();
 
         return binding.getRoot();

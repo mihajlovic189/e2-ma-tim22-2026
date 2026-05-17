@@ -83,7 +83,7 @@ public class RegisterFragment extends Fragment {
             }
 
             if (pass.equals(confirmPass)) {
-                User newUser = new User(email, username, region, pass);
+                User newUser = new User(email, username, region, pass, false);
 
                 authViewModel.register(newUser).observe(getViewLifecycleOwner(), poruka -> {
                     Toast.makeText(getContext(), poruka, Toast.LENGTH_LONG).show();

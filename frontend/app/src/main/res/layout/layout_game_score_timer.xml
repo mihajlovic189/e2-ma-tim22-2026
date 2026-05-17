@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="@drawable/input_bg"
+        android:padding="12dp"
+        android:orientation="vertical"
+        android:gravity="center">
+        <TextView android:id="@+id/tvPlayer1Name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Korisnik 1" android:maxLines="1" android:ellipsize="end" android:textColor="@color/hint" />
+        <TextView android:id="@+id/tvPlayer1Score" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="@color/text" android:textSize="24sp" android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:gravity="center"
+        android:orientation="vertical">
+        <TextView android:id="@+id/tvGameTimer" android:layout_width="60dp" android:layout_height="60dp"
+            android:background="@drawable/timer_circle_bg"
+            android:gravity="center"
+            android:text="60"
+            android:textColor="@color/text"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="@drawable/input_bg"
+        android:padding="12dp"
+        android:orientation="vertical"
+        android:gravity="center">
+        <TextView android:id="@+id/tvPlayer2Name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Korisnik 2" android:maxLines="1" android:ellipsize="end" android:textColor="@color/hint" />
+        <TextView android:id="@+id/tvPlayer2Score" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="@color/text" android:textSize="24sp" android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>
