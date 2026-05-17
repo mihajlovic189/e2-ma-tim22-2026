@@ -2,19 +2,24 @@ package com.example.slagalicaapp.ui.fragments;
 
 import android.content.res.ColorStateList;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
 import com.example.slagalicaapp.R;
+import com.example.slagalicaapp.ui.header.GameHeaderController;
 
 public class SkockoFragment extends Fragment {
+
+    private static final String TAG = "SkockoFragment";
 
     private int currentRow = 1;
     private int currentCol = 1;
@@ -24,6 +29,9 @@ public class SkockoFragment extends Fragment {
 
     private Button btnConfirmRow;
     private View rootView;
+
+    /** Kontroler za deljeni gornji GUI (Igrac 1 | Tajmer | Igrac 2). */
+    private GameHeaderController headerController;
 
     public SkockoFragment() {}
 
@@ -39,8 +47,53 @@ public class SkockoFragment extends Fragment {
         setupButtons(rootView);
         setupConfirmButton();
         setupCellClickRemoving(rootView);
+        setupGameHeader();
 
         return rootView;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // Vazno: zaustaviti CountDownTimer da ne pravi memory leak
+        if (headerController != null) {
+            headerController.release();
+            headerController = null;
+        }
+    }
+
+    // ----------------- HEADER + TAJMER (1. KT) -----------------
+
+    private void setupGameHeader() {
+        headerController = new GameHeaderController(rootView);
+        headerController.setPlayerNames("IGRAČ 1", "IGRAČ 2");
+        headerController.setOnTimerFinishedListener(this::onTimerExpired);
+        headerController.start();
+        Log.d(TAG, "Skocko: tajmer pokrenut na 60s.");
+    }
+
+    /** Poziva se kad istekne vreme za rundu. */
+    private void onTimerExpired() {
+        Log.d(TAG, "Skocko: vreme isteklo.");
+        if (getContext() != null) {
+            Toast.makeText(getContext(),
+                    "Vreme je isteklo!", Toast.LENGTH_SHORT).show();
+        }
+        // Onemoguci sva dugmad sa simbolima i potvrdu reda
+        disableAllInput();
+    }
+
+    private void disableAllInput() {
+        if (rootView == null) return;
+        int[] symbolButtons = {
+                R.id.btn_karo, R.id.btn_srce, R.id.btn_tref,
+                R.id.btn_pik, R.id.btn_sova, R.id.btn_zvezda
+        };
+        for (int id : symbolButtons) {
+            ImageButton b = rootView.findViewById(id);
+            if (b != null) b.setEnabled(false);
+        }
+        if (btnConfirmRow != null) btnConfirmRow.setEnabled(false);
     }
 
     private void setupButtons(View view) {
