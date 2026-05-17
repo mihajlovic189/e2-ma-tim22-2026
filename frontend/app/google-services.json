@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "737923458475",
+    "firebase_url": "https://slagalica-mobilna-aplikacija-default-rtdb.europe-west1.firebasedatabase.app",
     "project_id": "slagalica-mobilna-aplikacija",
     "storage_bucket": "slagalica-mobilna-aplikacija.firebasestorage.app"
   },

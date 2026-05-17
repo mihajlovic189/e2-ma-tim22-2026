@@ -1,0 +1,40 @@
+{
+  "korak_pool": {
+    "item1": {
+      "solution": "TELEFON",
+      "steps": {
+        "0": "Izumeo ga Alexander Graham Bell",
+        "1": "Ima brojanik ili ekran",
+        "2": "Sluzi za komunikaciju",
+        "3": "Moze biti mobilni",
+        "4": "Halo",
+        "5": "Poziv",
+        "6": "Uredjaj za razgovor"
+      }
+    },
+    "item2": {
+      "solution": "SUNCE",
+      "steps": {
+        "0": "Zvezda",
+        "1": "Greje planetu",
+        "2": "Izlazi ujutru",
+        "3": "Sija danju",
+        "4": "Na nebu",
+        "5": "Toplota",
+        "6": "Zuta kugla"
+      }
+    },
+    "item3": {
+      "solution": "AUTOMOBIL",
+      "steps": {
+        "0": "Ima motor",
+        "1": "Vozi se po putu",
+        "2": "Ima gume",
+        "3": "Moze biti elektricni",
+        "4": "Ima volan",
+        "5": "Prevozno sredstvo",
+        "6": "Auto"
+      }
+    }
+  }
+}

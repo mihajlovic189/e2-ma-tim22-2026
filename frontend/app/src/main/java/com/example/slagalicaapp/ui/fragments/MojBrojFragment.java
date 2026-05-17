@@ -16,31 +16,36 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import com.example.slagalicaapp.databinding.FragmentMojBrojBinding;
+import com.example.slagalicaapp.data.firebase.MojBrojManager;
+import com.example.slagalicaapp.ui.activities.GameActivity;
 
 import net.objecthunter.exp4j.Expression;
 import net.objecthunter.exp4j.ExpressionBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 public class MojBrojFragment extends Fragment implements SensorEventListener {
 
-    private FragmentMojBrojBinding binding;
-    private Random random = new Random();
+    private MojBrojManager firebaseManager;
+    private String roomId;
+    private int myPlayerNumber;
+    private boolean iAmActivePlayer;
+    private boolean numbersAlreadyRevealed = false;
+    private boolean targetAlreadyRevealed = false;
+    private boolean hasSubmitted = false;
 
+    private FragmentMojBrojBinding binding;
     private int targetNumber = 0;
     private List<Integer> availableNumbers = new ArrayList<>();
     private int stopCount = 0;
 
     private int player1Points = 0;
     private int player2Points = 0;
-    private Integer player1Result = null;
-    private int currentRound = 1;
-    private boolean isPlayer1Turn = true;
 
     private SensorManager sensorManager;
     private float acceleration = 0f;
@@ -48,6 +53,8 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     private float lastAcceleration = 0f;
     private CountDownTimer gameTimer;
     private Handler autoStopHandler = new Handler();
+    private Runnable autoTargetRunnable;
+    private Runnable autoNumbersRunnable;
 
     private List<View> inputHistory = new ArrayList<>();
 
@@ -55,11 +62,199 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         binding = FragmentMojBrojBinding.inflate(inflater, container, false);
 
+        Bundle args = getArguments();
+        if (args != null) {
+            roomId = args.getString("roomId");
+            myPlayerNumber = args.getInt("playerNumber", 1);
+        }
+
         setupShakeSensor();
         setupClickListeners();
-        startAutoStopTimer();
+        setupFirebase();
 
         return binding.getRoot();
+    }
+
+    private void setupFirebase() {
+        if (roomId == null) return;
+
+        if (binding != null && binding.gameStatus.btnForfeit != null) {
+            binding.gameStatus.btnForfeit.setOnClickListener(v -> showForfeitDialog());
+        }
+
+        firebaseManager = new MojBrojManager(roomId, myPlayerNumber,
+                new MojBrojManager.MojBrojListener() {
+
+                    @Override
+                    public void onRoundStarted(int activePlayer, int round,
+                                               int targetNumber, List<Integer> numbers) {
+                        requireActivity().runOnUiThread(() -> {
+                            iAmActivePlayer = (activePlayer == myPlayerNumber);
+                            numbersAlreadyRevealed = false;
+                            targetAlreadyRevealed = false;
+                            hasSubmitted = false;
+                            stopCount = 0;
+                            inputHistory.clear();
+
+                            binding.tvTargetNumber.setText("?");
+                            binding.btnStop.setVisibility(View.VISIBLE);
+                            binding.btnStop.setEnabled(iAmActivePlayer);
+                            binding.btnSubmit.setVisibility(View.GONE);
+                            binding.tvExpression.setText("");
+                            setInputEnabled(false);
+
+                            for (int i = 0; i < 6; i++) {
+                                TextView tv = (TextView) binding.numbersContainer.getChildAt(i);
+                                tv.setText("?");
+                                tv.setEnabled(false);
+                                tv.setAlpha(0.5f);
+                            }
+
+                            Toast.makeText(getContext(),
+                                    "Runda " + round + " — " +
+                                            (iAmActivePlayer ? "Ti biraš!" : "Protivnik bira brojeve"),
+                                    Toast.LENGTH_SHORT).show();
+
+                            startAutoTargetTimer();
+                        });
+                    }
+
+                    @Override
+                    public void onTargetRevealed(int targetNumber) {
+                        requireActivity().runOnUiThread(() -> {
+                            if (targetAlreadyRevealed) return;
+                            targetAlreadyRevealed = true;
+                            MojBrojFragment.this.targetNumber = targetNumber;
+                            binding.tvTargetNumber.setText(String.valueOf(targetNumber));
+                            stopCount = 1;
+                            startAutoNumbersTimer();
+                        });
+                    }
+
+                    @Override
+                    public void onNumbersRevealed(int target, List<Integer> numbers) {
+                        requireActivity().runOnUiThread(() -> {
+                            if (numbersAlreadyRevealed) return;
+                            numbersAlreadyRevealed = true;
+                            targetAlreadyRevealed = true;
+                            autoStopHandler.removeCallbacksAndMessages(null);
+
+                            MojBrojFragment.this.targetNumber = target;
+                            availableNumbers.clear();
+                            availableNumbers.addAll(numbers);
+
+                            binding.tvTargetNumber.setText(String.valueOf(target));
+                            for (int i = 0; i < 6; i++) {
+                                TextView tv = (TextView) binding.numbersContainer.getChildAt(i);
+                                tv.setText(String.valueOf(numbers.get(i)));
+                                tv.setEnabled(true);
+                                tv.setAlpha(1.0f);
+                            }
+
+                            binding.btnStop.setVisibility(View.GONE);
+                            binding.btnSubmit.setVisibility(View.VISIBLE);
+                            binding.btnSubmit.setEnabled(false);
+                            setInputEnabled(true);
+
+                            stopCount = 2;
+                            startGameTimer();
+
+                            new Handler().postDelayed(() -> {
+                                if (binding != null) binding.btnSubmit.setEnabled(true);
+                            }, 5000);
+                        });
+                    }
+
+                    @Override
+                    public void onOpponentSubmitted() {
+                        requireActivity().runOnUiThread(() ->
+                                Toast.makeText(getContext(),
+                                        "Protivnik je predao odgovor!", Toast.LENGTH_SHORT).show()
+                        );
+                    }
+
+                    @Override
+                    public void onRoundResult(int p1Score, int p2Score,
+                                              int correctNumber, String message) {
+                        requireActivity().runOnUiThread(() -> {
+                            if (gameTimer != null) gameTimer.cancel();
+                            player1Points = p1Score;
+                            player2Points = p2Score;
+                            updateScoreUI();
+                            Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
+
+                            new Handler().postDelayed(() -> {
+                                if (firebaseManager != null) {
+                                    firebaseManager.startNextRoundIfReady(2);
+                                }
+                            }, 5000);
+                        });
+                    }
+
+                    @Override
+                    public void onGameFinished(int p1Score, int p2Score, String forfeitBy) {
+                        requireActivity().runOnUiThread(() -> {
+                            if (gameTimer != null) gameTimer.cancel();
+                            player1Points = p1Score;
+                            player2Points = p2Score;
+                            updateScoreUI();
+                            binding.btnStop.setEnabled(false);
+                            binding.btnSubmit.setEnabled(false);
+                            setInputEnabled(false);
+
+                            String winner;
+                            if (forfeitBy != null && !forfeitBy.isEmpty()) {
+                                boolean iForfeited = forfeitBy.equals("player" + myPlayerNumber);
+                                winner = iForfeited ? "Odustao si." : "Protivnik je odustao.";
+                            } else if (p1Score > p2Score) {
+                                winner = "Igrač 1 pobijedio!";
+                            } else if (p2Score > p1Score) {
+                                winner = "Igrač 2 pobijedio!";
+                            } else {
+                                winner = "Neriješeno!";
+                            }
+
+                            Toast.makeText(getContext(),
+                                    "Kraj igre! " + winner + " (" + p1Score + ":" + p2Score + ")",
+                                    Toast.LENGTH_LONG).show();
+                            new Handler().postDelayed(MojBrojFragment.this::notifyGameFinished, 5000);
+                        });
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        requireActivity().runOnUiThread(() ->
+                                Toast.makeText(getContext(), "Greška: " + message, Toast.LENGTH_SHORT).show()
+                        );
+                    }
+                });
+
+        firebaseManager.startListening();
+        loadPlayerNamesAndScores();
+    }
+
+    private void loadPlayerNamesAndScores() {
+        com.google.firebase.database.DatabaseReference roomRef =
+                com.google.firebase.database.FirebaseDatabase.getInstance().getReference()
+                        .child("rooms").child("MOJ_BROJ").child(roomId);
+        roomRef.addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
+                String p1 = snapshot.child("player1").getValue(String.class);
+                String p2 = snapshot.child("player2").getValue(String.class);
+                Long s1 = snapshot.child("scores").child("player1").getValue(Long.class);
+                Long s2 = snapshot.child("scores").child("player2").getValue(Long.class);
+
+                if (p1 != null) binding.gameStatus.tvPlayer1Name.setText(p1);
+                if (p2 != null) binding.gameStatus.tvPlayer2Name.setText(p2);
+                if (s1 != null) player1Points = s1.intValue();
+                if (s2 != null) player2Points = s2.intValue();
+                updateScoreUI();
+            }
+
+            @Override
+            public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
+        });
     }
 
     private void setupClickListeners() {
@@ -93,42 +288,22 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     }
 
     private void handleStopAction() {
+        if (!iAmActivePlayer || numbersAlreadyRevealed) return;
+
         autoStopHandler.removeCallbacksAndMessages(null);
 
         if (stopCount == 0) {
-            targetNumber = random.nextInt(999) + 1;
-            binding.tvTargetNumber.setText(String.valueOf(targetNumber));
             stopCount = 1;
-            startAutoStopTimer();
-        }
-        else if (stopCount == 1) {
-            generateAvailableNumbers();
-
-            for (int i = 0; i < 6; i++) {
-                TextView tv = (TextView) binding.numbersContainer.getChildAt(i);
-                tv.setText(String.valueOf(availableNumbers.get(i)));
+            if (firebaseManager != null && iAmActivePlayer) {
+                firebaseManager.revealTargetNumber();
             }
 
+        } else if (stopCount == 1) {
             stopCount = 2;
-            binding.btnStop.setVisibility(View.GONE);
-            binding.btnSubmit.setVisibility(View.VISIBLE);
-            binding.btnSubmit.setEnabled(false);
-
-            startGameTimer();
-
-            new Handler().postDelayed(() -> {
-                if (binding != null) binding.btnSubmit.setEnabled(true);
-            }, 5000);
+            if (firebaseManager != null && iAmActivePlayer) {
+                firebaseManager.revealNumbers();
+            }
         }
-    }
-
-    private void generateAvailableNumbers() {
-        availableNumbers.clear();
-        for (int i = 0; i < 4; i++) availableNumbers.add(random.nextInt(9) + 1);
-        int[] med = {10, 15, 20};
-        availableNumbers.add(med[random.nextInt(3)]);
-        int[] large = {25, 50, 75, 100};
-        availableNumbers.add(large[random.nextInt(4)]);
     }
 
     private void deleteLastEntry() {
@@ -149,6 +324,8 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     }
 
     private void evaluateResult() {
+        if (hasSubmitted) return;
+
         int currentResult = 0;
         String expressionStr = binding.tvExpression.getText().toString();
 
@@ -162,35 +339,14 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
             Toast.makeText(getContext(), "Neispravan izraz!", Toast.LENGTH_SHORT).show();
         }
 
-        if (player1Result == null) {
-            player1Result = currentResult;
-            Toast.makeText(getContext(), "Igrač 1 rezultat: " + player1Result, Toast.LENGTH_SHORT).show();
-            calculateFinalScores(player1Result, 0);
+        if (firebaseManager != null) {
+            firebaseManager.submitResult(expressionStr, currentResult);
+            hasSubmitted = true;
+            binding.btnSubmit.setEnabled(false);
+            setInputEnabled(false);
+            Toast.makeText(getContext(),
+                    "Predano! Tvoj rezultat: " + currentResult, Toast.LENGTH_SHORT).show();
         }
-    }
-
-    private void calculateFinalScores(int p1Res, int p2Res) {
-        int p1Diff = Math.abs(targetNumber - p1Res);
-        int p2Diff = Math.abs(targetNumber - p2Res);
-
-        if (p1Res == targetNumber) {
-            player1Points += 10;
-        } else if (p2Res == targetNumber) {
-            player2Points += 10;
-        }
-        else if (p1Res != 0 || p2Res != 0) {
-            if (p1Res != 0 && (p2Res == 0 || p1Diff < p2Diff)) {
-                player1Points += 5;
-            } else if (p2Res != 0 && (p1Res == 0 || p2Diff < p1Diff)) {
-                player2Points += 5;
-            }
-            else if (p1Res == p2Res) {
-                if (isPlayer1Turn) player1Points += 5; else player2Points += 5;
-            }
-        }
-
-        updateScoreUI();
-
     }
 
     private void updateScoreUI() {
@@ -198,8 +354,45 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
         binding.gameStatus.tvPlayer2Score.setText(String.valueOf(player2Points));
     }
 
-    private void startAutoStopTimer() {
-        autoStopHandler.postDelayed(this::handleStopAction, 5000);
+    private void notifyGameFinished() {
+        Bundle result = new Bundle();
+        result.putString("game", "MOJ_BROJ");
+        getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
+    }
+
+    private void showForfeitDialog() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Odustajanje")
+                .setMessage("Ako odustaneš, smatra se da si izgubio. Da li želiš da odustaneš?")
+                .setPositiveButton("Odustani", (dialog, which) -> requestForfeit())
+                .setNegativeButton("Nastavi", null)
+                .show();
+    }
+
+    private void requestForfeit() {
+        if (getActivity() instanceof GameActivity) {
+            ((GameActivity) getActivity()).forfeitMatch();
+        }
+    }
+
+    private void startAutoTargetTimer() {
+        if (autoTargetRunnable != null) autoStopHandler.removeCallbacks(autoTargetRunnable);
+        autoTargetRunnable = () -> {
+            if (firebaseManager != null) {
+                firebaseManager.revealTargetIfNeeded();
+            }
+        };
+        autoStopHandler.postDelayed(autoTargetRunnable, 5000);
+    }
+
+    private void startAutoNumbersTimer() {
+        if (autoNumbersRunnable != null) autoStopHandler.removeCallbacks(autoNumbersRunnable);
+        autoNumbersRunnable = () -> {
+            if (firebaseManager != null) {
+                firebaseManager.revealNumbersIfNeeded();
+            }
+        };
+        autoStopHandler.postDelayed(autoNumbersRunnable, 5000);
     }
 
     private void startGameTimer() {
@@ -210,9 +403,27 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
             }
             @Override
             public void onFinish() {
-                evaluateResult();
+                if (!hasSubmitted) {
+                    evaluateResult();
+                }
+                if (firebaseManager != null) {
+                    firebaseManager.finalizeOnTimeout();
+                }
             }
         }.start();
+    }
+
+    private void setInputEnabled(boolean enabled) {
+        for (int i = 0; i < binding.operandsGrid.getChildCount(); i++) {
+            View v = binding.operandsGrid.getChildAt(i);
+            v.setEnabled(enabled);
+        }
+        for (int i = 0; i < binding.numbersContainer.getChildCount(); i++) {
+            View v = binding.numbersContainer.getChildAt(i);
+            v.setEnabled(enabled);
+            v.setAlpha(enabled ? 1.0f : 0.5f);
+        }
+        binding.btnDelete.setEnabled(enabled);
     }
 
     private void setupShakeSensor() {
@@ -245,9 +456,11 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        sensorManager.unregisterListener(this);
+        if (sensorManager != null) sensorManager.unregisterListener(this);
         autoStopHandler.removeCallbacksAndMessages(null);
+        if (firebaseManager != null) firebaseManager.stopListening();
         if (gameTimer != null) gameTimer.cancel();
         binding = null;
     }
 }
+

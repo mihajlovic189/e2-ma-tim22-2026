@@ -1,0 +1,13 @@
+{
+  "name": "firebase-seed",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "validate": "node validate_seed.js",
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
