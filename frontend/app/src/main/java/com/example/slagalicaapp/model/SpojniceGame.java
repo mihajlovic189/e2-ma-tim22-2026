@@ -7,6 +7,10 @@ public class SpojniceGame {
     private String description;
     private Map<String, String> pairs;
 
+    public SpojniceGame() {
+        // Default constructor required for calls to DataSnapshot.getValue(SpojniceGame.class)
+    }
+
     public SpojniceGame(String description, Map<String, String> pairs) {
         this.description = description;
         this.pairs = pairs;
@@ -20,4 +24,3 @@ public class SpojniceGame {
         return pairs;
     }
 }
-

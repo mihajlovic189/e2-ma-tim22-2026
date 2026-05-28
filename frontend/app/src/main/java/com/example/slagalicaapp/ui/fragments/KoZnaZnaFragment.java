@@ -2,6 +2,7 @@ package com.example.slagalicaapp.ui.fragments;
 
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,9 +16,15 @@ import androidx.fragment.app.Fragment;
 
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.model.Question;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -26,6 +33,8 @@ public class KoZnaZnaFragment extends Fragment {
     private static final int QUESTION_TIME = 5000;
     private static final int POINTS_CORRECT = 10;
     private static final int POINTS_INCORRECT = -5;
+    private static final int NUMBER_OF_QUESTIONS = 5;
+
 
     private TextView player1Username, player1Score, player2Username, player2Score;
     private TextView questionNumber, timer, questionText;
@@ -34,6 +43,7 @@ public class KoZnaZnaFragment extends Fragment {
 
     private CountDownTimer questionTimer;
 
+    private DatabaseReference mDatabase;
     private List<Question> questions;
     private int currentQuestionIndex = 0;
     private int player1Points = 0;
@@ -60,8 +70,8 @@ public class KoZnaZnaFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         initializeViews(view);
+        mDatabase = FirebaseDatabase.getInstance("https://slagalica-mobilna-aplikacija-default-rtdb.europe-west1.firebasedatabase.app/").getReference();
         prepareQuestions();
-        startGame();
     }
 
     private void initializeViews(View view) {
@@ -88,11 +98,25 @@ public class KoZnaZnaFragment extends Fragment {
 
     private void prepareQuestions() {
         questions = new ArrayList<>();
-        questions.add(new Question("Koji je glavni grad Srbije?", Arrays.asList("Beograd", "Novi Sad", "Niš", "Kragujevac"), 0));
-        questions.add(new Question("Koja je najduža reka na svetu?", Arrays.asList("Nil", "Amazon", "Jangce", "Misisipi"), 1));
-        questions.add(new Question("Ko je napisao 'Na Drini ćuprija'?", Arrays.asList("Meša Selimović", "Danilo Kiš", "Ivo Andrić", "Miloš Crnjanski"), 2));
-        questions.add(new Question("Koja planeta je najbliža Suncu?", Arrays.asList("Venera", "Mars", "Merkur", "Zemlja"), 2));
-        questions.add(new Question("U kom gradu se nalazi Krivi toranj?", Arrays.asList("Rim", "Piza", "Firenca", "Venecija"), 1));
+        mDatabase.child("KoZnaZna").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                List<Question> allQuestions = new ArrayList<>();
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Question question = snapshot.getValue(Question.class);
+                    allQuestions.add(question);
+                }
+                Collections.shuffle(allQuestions);
+                questions = allQuestions.subList(0, Math.min(NUMBER_OF_QUESTIONS, allQuestions.size()));
+                startGame();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                // Handle error
+                Log.e("KoZnaZnaFragment", "Error loading questions", databaseError.toException());
+            }
+        });
     }
 
     private void startGame() {
