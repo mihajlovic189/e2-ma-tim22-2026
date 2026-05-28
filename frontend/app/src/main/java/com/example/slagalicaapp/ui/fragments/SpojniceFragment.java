@@ -18,6 +18,11 @@ import androidx.fragment.app.Fragment;
 
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.model.SpojniceGame;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,12 +34,14 @@ public class SpojniceFragment extends Fragment {
 
     private static final int ROUND_TIME = 30000;
     private static final int POINTS_PER_PAIR = 2;
+    private static final int NUMBER_OF_GAMES = 2;
 
     private TextView roundInfo, player1Username, player1Score, player2Username, player2Score, currentPlayerInfo, connectionDescription;
     private ProgressBar timerProgress;
     private LinearLayout connectionsContainer;
 
     private CountDownTimer timer;
+    private DatabaseReference mDatabase;
     private List<SpojniceGame> games;
     private int currentRound = 0;
     private int player1Points = 0;
@@ -60,8 +67,8 @@ public class SpojniceFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         initializeViews(view);
+        mDatabase = FirebaseDatabase.getInstance("https://slagalica-mobilna-aplikacija-default-rtdb.europe-west1.firebasedatabase.app/").getReference();
         prepareGames();
-        startRound();
     }
 
     private void initializeViews(View view) {
@@ -78,21 +85,24 @@ public class SpojniceFragment extends Fragment {
 
     private void prepareGames() {
         games = new ArrayList<>();
-        Map<String, String> game1Pairs = new HashMap<>();
-        game1Pairs.put("Miroslav Ilić", "Zašto su dani tužni");
-        game1Pairs.put("Bajaga", "442 do Beograda");
-        game1Pairs.put("Dino Merlin", "Kad zamirišu jorgovani");
-        game1Pairs.put("Bijelo Dugme", "Lipe cvatu");
-        game1Pairs.put("Tozovac", "Niz polja se proteže");
-        games.add(new SpojniceGame("Poveži izvođače i nazive pesama", game1Pairs));
+        mDatabase.child("Spojnice").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                List<SpojniceGame> allGames = new ArrayList<>();
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    SpojniceGame game = snapshot.getValue(SpojniceGame.class);
+                    allGames.add(game);
+                }
+                Collections.shuffle(allGames);
+                games = allGames.subList(0, Math.min(NUMBER_OF_GAMES, allGames.size()));
+                startRound();
+            }
 
-        Map<String, String> game2Pairs = new HashMap<>();
-        game2Pairs.put("Srbija", "Beograd");
-        game2Pairs.put("Francuska", "Pariz");
-        game2Pairs.put("Nemačka", "Berlin");
-        game2Pairs.put("Italija", "Rim");
-        game2Pairs.put("Španija", "Madrid");
-        games.add(new SpojniceGame("Poveži države i glavne gradove", game2Pairs));
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                // Handle error
+            }
+        });
     }
 
     private void startRound() {

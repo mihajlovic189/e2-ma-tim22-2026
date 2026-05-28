@@ -7,6 +7,10 @@ public class Question {
     private List<String> options;
     private int correctAnswerIndex;
 
+    public Question() {
+        // Default constructor required for calls to DataSnapshot.getValue(Question.class)
+    }
+
     public Question(String questionText, List<String> options, int correctAnswerIndex) {
         this.questionText = questionText;
         this.options = options;
@@ -25,4 +29,3 @@ public class Question {
         return correctAnswerIndex;
     }
 }
-
