@@ -52,8 +52,8 @@
 				android:padding="16dp"
 				android:orientation="vertical">
 
-				<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Igrač 1" android:textColor="@color/hint" />
-				<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="@color/text" android:textSize="30sp" android:textStyle="bold" />
+				<TextView android:id="@+id/player1_username" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Igrač 1" android:textColor="@color/hint" />
+				<TextView android:id="@+id/player1_score" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="@color/text" android:textSize="30sp" android:textStyle="bold" />
 			</LinearLayout>
 
 			<LinearLayout
@@ -65,8 +65,8 @@
 				android:padding="16dp"
 				android:orientation="vertical">
 
-				<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Igrač 2" android:textColor="@color/hint" />
-				<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="@color/text" android:textSize="30sp" android:textStyle="bold" />
+				<TextView android:id="@+id/player2_username" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Igrač 2" android:textColor="@color/hint" />
+				<TextView android:id="@+id/player2_score" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="@color/text" android:textSize="30sp" android:textStyle="bold" />
 			</LinearLayout>
 		</LinearLayout>
 
@@ -85,6 +85,7 @@
 				android:gravity="center_vertical">
 
 				<TextView
+					android:id="@+id/question_number"
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
 					android:layout_weight="1"
@@ -94,6 +95,7 @@
 					android:textStyle="bold" />
 
 				<TextView
+					android:id="@+id/timer"
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:text="00:25"
@@ -103,6 +105,7 @@
 			</LinearLayout>
 
 			<ProgressBar
+				android:id="@+id/timer_progress"
 				style="@android:style/Widget.ProgressBar.Horizontal"
 				android:layout_width="match_parent"
 				android:layout_height="8dp"
@@ -122,6 +125,7 @@
 			android:orientation="vertical">
 
 			<TextView
+				android:id="@+id/question_text"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
 				android:text="Koji je glavni grad Srbije?"
@@ -152,5 +156,4 @@
 
 	</LinearLayout>
 </ScrollView>
-
 
