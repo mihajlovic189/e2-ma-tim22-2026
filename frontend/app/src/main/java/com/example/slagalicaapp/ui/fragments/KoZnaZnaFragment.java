@@ -21,6 +21,8 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -120,7 +122,18 @@ public class KoZnaZnaFragment extends Fragment {
     }
 
     private void startGame() {
-        player1Username.setText("Igrac 1");
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            String username = currentUser.getDisplayName();
+            if (username != null && !username.isEmpty()) {
+                player1Username.setText(username);
+            } else {
+                // Fallback if display name is not set
+                player1Username.setText("Igrac 1");
+            }
+        } else {
+            player1Username.setText("Igrac 1");
+        }
         player2Username.setText("Igrac 2");
         showQuestion();
     }

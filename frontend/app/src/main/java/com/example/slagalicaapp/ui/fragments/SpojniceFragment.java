@@ -23,6 +23,8 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -81,6 +83,19 @@ public class SpojniceFragment extends Fragment {
         timerProgress = view.findViewById(R.id.timer_progress);
         connectionsContainer = view.findViewById(R.id.connections_container);
         connectionDescription = view.findViewById(R.id.connection_description);
+
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            String username = currentUser.getDisplayName();
+            if (username != null && !username.isEmpty()) {
+                player1Username.setText(username);
+            } else {
+                player1Username.setText("Igrac 1");
+            }
+        } else {
+            player1Username.setText("Igrac 1");
+        }
+        player2Username.setText("Igrac 2");
     }
 
     private void prepareGames() {
@@ -193,7 +208,8 @@ public class SpojniceFragment extends Fragment {
     }
 
     private void startTurn() {
-        currentPlayerInfo.setText("Na potezu je: Igrač " + currentPlayer);
+        String username = player1Username.getText().toString();
+        currentPlayerInfo.setText("Na potezu je: " + (currentPlayer == 1 ? username : "Igrač 2"));
         setButtonsEnabled(true);
 
         timer = new CountDownTimer(ROUND_TIME, 1000) {
