@@ -8,6 +8,7 @@ import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.UserProfileChangeRequest;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -110,8 +111,19 @@ public class AuthRepository {
                     if (task.isSuccessful()) {
                         FirebaseUser fUser = mAuth.getCurrentUser();
                         if (fUser != null) {
-                            fUser.sendEmailVerification();
-                            saveUserToFirestore(user, fUser.getUid(), false, result);
+
+                            UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
+                                    .setDisplayName(user.getUsername())
+                                    .build();
+
+                            fUser.updateProfile(profileUpdates).addOnCompleteListener(updateTask -> {
+                                if(updateTask.isSuccessful()){
+                                    fUser.sendEmailVerification();
+                                    saveUserToFirestore(user, fUser.getUid(), false, result);
+                                } else {
+                                    result.setValue("Greška pri ažuriranju profila.");
+                                }
+                            });
                         }
                     } else {
                         result.setValue("Greška: " + task.getException().getMessage());
@@ -123,7 +135,7 @@ public class AuthRepository {
         MutableLiveData<FirebaseUser> userLiveData = new MutableLiveData<>();
 
         if (identity.contains("@")) {
-            performFirebaseLogin(identity, password, userLiveData);
+            performFirebaseLogin(identity, password, identity, userLiveData);
         } else {
             db.collection("users")
                     .whereEqualTo("username", identity)
@@ -131,7 +143,7 @@ public class AuthRepository {
                     .addOnCompleteListener(task -> {
                         if (task.isSuccessful() && !task.getResult().isEmpty()) {
                             String email = task.getResult().getDocuments().get(0).getString("email");
-                            performFirebaseLogin(email, password, userLiveData);
+                            performFirebaseLogin(email, password, identity, userLiveData);
                         } else {
                             userLiveData.setValue(null);
                         }
@@ -190,13 +202,22 @@ public class AuthRepository {
         mAuth.signOut();
     }
 
-    private void performFirebaseLogin(String email, String password, MutableLiveData<FirebaseUser> liveData) {
+    private void performFirebaseLogin(String email, String password, String identity, MutableLiveData<FirebaseUser> liveData) {
         mAuth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null && user.isEmailVerified()) {
-                            liveData.setValue(user);
+                            if (user.getDisplayName() == null || user.getDisplayName().isEmpty()) {
+                                String username = identity.contains("@") ? "" : identity;
+                                if (!username.isEmpty()) {
+                                    updateDisplayName(user, username, liveData);
+                                } else {
+                                    fetchUsernameFromDbAndSetDisplayName(user, liveData);
+                                }
+                            } else {
+                                liveData.setValue(user);
+                            }
                         } else {
                             mAuth.signOut();
                             liveData.setValue(null);
@@ -205,6 +226,30 @@ public class AuthRepository {
                         liveData.setValue(null);
                     }
                 });
+    }
+
+    private void updateDisplayName(FirebaseUser user, String username, MutableLiveData<FirebaseUser> liveData) {
+        UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
+                .setDisplayName(username)
+                .build();
+        user.updateProfile(profileUpdates).addOnCompleteListener(updateTask -> {
+            liveData.setValue(user); // Vraćamo korisnika bez obzira na ishod ažuriranja
+        });
+    }
+
+    private void fetchUsernameFromDbAndSetDisplayName(FirebaseUser user, MutableLiveData<FirebaseUser> liveData) {
+        db.collection("users").document(user.getUid()).get().addOnCompleteListener(docTask -> {
+            if (docTask.isSuccessful() && docTask.getResult() != null) {
+                String username = docTask.getResult().getString("username");
+                if (username != null && !username.isEmpty()) {
+                    updateDisplayName(user, username, liveData);
+                } else {
+                    liveData.setValue(user);
+                }
+            } else {
+                liveData.setValue(user);
+            }
+        });
     }
 
     public LiveData<String> changePassword(String oldPass, String newPass) {

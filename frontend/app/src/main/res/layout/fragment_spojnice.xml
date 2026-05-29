@@ -92,7 +92,7 @@
                 android:id="@+id/current_player_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Igrač koji počinje rundu: Igrač 1"
+                android:text="Igrač koji počinje rundu: username"
                 android:textColor="@color/text"
                 android:textSize="18sp"
                 android:textStyle="bold" />
