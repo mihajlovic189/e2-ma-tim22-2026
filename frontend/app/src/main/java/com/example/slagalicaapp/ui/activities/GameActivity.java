@@ -2,17 +2,26 @@ package com.example.slagalicaapp.ui.activities;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import com.example.slagalicaapp.model.GameResult;
+import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.ui.fragments.KorakPoKorakFragment;
 import com.example.slagalicaapp.ui.fragments.MojBrojFragment;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 public class GameActivity extends AppCompatActivity {
+
+    private static final String TAG = "GameActivity";
 
     public static final String EXTRA_GAME_TYPE = "GAME_TYPE";
     public static final String EXTRA_ROOM_ID   = "ROOM_ID";
@@ -27,6 +36,9 @@ public class GameActivity extends AppCompatActivity {
     private String currentGameType;
     private String playerName;
     private boolean hasForfeited = false;
+    private boolean finalResultSaved = false;
+
+    private final GameResultRepository gameResultRepository = new GameResultRepository();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,7 +61,7 @@ public class GameActivity extends AppCompatActivity {
                         new Handler().postDelayed(() ->
                                 syncMojBrojRoomFromKorak(() -> showGameFragment(currentGameType)), 5000);
                     } else {
-                        finish();
+                        persistFinalResultAndFinish(false);
                     }
                 });
 
@@ -142,7 +154,7 @@ public class GameActivity extends AppCompatActivity {
 
         updateForfeitRoom(GAME_KORAK, playerKey, winnerKey, finishedAt);
         updateForfeitRoom(GAME_MOJ_BROJ, playerKey, winnerKey, finishedAt);
-        finish();
+        persistFinalResultAndFinish(true);
     }
 
     private void updateForfeitRoom(String gameType, String playerKey, String winnerKey, long finishedAt) {
@@ -156,6 +168,124 @@ public class GameActivity extends AppCompatActivity {
         update.put("winner", winnerKey);
         update.put("finishedAt", finishedAt);
         roomRef.updateChildren(update);
+    }
+
+    private void persistFinalResultAndFinish(boolean forfeit) {
+        if (finalResultSaved || roomId == null) {
+            finish();
+            return;
+        }
+
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Log.e(TAG, "Cannot save game result: no authenticated user is available.");
+            Toast.makeText(this, "Rezultat nije sačuvan: korisnik nije prijavljen.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        finalResultSaved = true;
+        String resultGameType = currentGameType != null ? currentGameType : GAME_KORAK;
+        long finishedAt = System.currentTimeMillis();
+
+        DatabaseReference roomRef = FirebaseDatabase.getInstance().getReference()
+                .child("rooms").child(resultGameType).child(roomId);
+
+        roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                GameResult result = buildGameResult(snapshot, resultGameType, finishedAt, forfeit);
+                Log.d(TAG, "Saving game result to Firestore collection ko_zna_zna_results: " + result.gameType);
+                gameResultRepository.saveGameResult(result)
+                        .addOnSuccessListener(documentReference -> {
+                            Toast.makeText(GameActivity.this, "Rezultat sačuvan.", Toast.LENGTH_SHORT).show();
+                            finish();
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Failed to save game result to Firestore", e);
+                            Toast.makeText(GameActivity.this, "Rezultat nije sačuvan. Proveri Firestore rules.", Toast.LENGTH_LONG).show();
+                            finish();
+                        });
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                finish();
+            }
+        });
+    }
+
+    private GameResult buildGameResult(DataSnapshot snapshot, String gameType, long finishedAt, boolean forfeit) {
+        String player1Name = snapshot.child("player1").getValue(String.class);
+        String player2Name = snapshot.child("player2").getValue(String.class);
+        String player1Uid = snapshot.child("player1Uid").getValue(String.class);
+        String player2Uid = snapshot.child("player2Uid").getValue(String.class);
+        int player1Score = readInt(snapshot.child("scores").child("player1").getValue(), 0);
+        int player2Score = readInt(snapshot.child("scores").child("player2").getValue(), 0);
+        long startedAt = readLong(snapshot.child("startedAt").getValue(), finishedAt);
+        int questionsCount = readInt(snapshot.child("currentRound").getValue(), 0);
+
+        String winnerUid;
+        if (forfeit) {
+            winnerUid = playerNumber == 1 ? player2Uid : player1Uid;
+        } else {
+            String winner = snapshot.child("winner").getValue(String.class);
+            if ("player1".equalsIgnoreCase(winner)) {
+                winnerUid = player1Uid;
+            } else if ("player2".equalsIgnoreCase(winner)) {
+                winnerUid = player2Uid;
+            } else if (player1Score > player2Score) {
+                winnerUid = player1Uid;
+            } else if (player2Score > player1Score) {
+                winnerUid = player2Uid;
+            } else {
+                winnerUid = null;
+            }
+        }
+
+        long durationMs = Math.max(0L, finishedAt - startedAt);
+
+        return new GameResult(
+                gameType,
+                player1Uid,
+                player1Name,
+                player1Score,
+                player2Uid,
+                player2Name,
+                player2Score,
+                winnerUid,
+                finishedAt,
+                durationMs,
+                questionsCount
+        );
+    }
+
+    private int readInt(Object value, int fallback) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof String) {
+            try {
+                return Integer.parseInt((String) value);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private long readLong(Object value, long fallback) {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof String) {
+            try {
+                return Long.parseLong((String) value);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
     }
 
     private void syncMojBrojRoomFromKorak(Runnable onDone) {
