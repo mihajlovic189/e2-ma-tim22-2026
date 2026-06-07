@@ -9,13 +9,16 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.slagalicaapp.R;
+import com.example.slagalicaapp.model.GameResult;
 import com.example.slagalicaapp.model.Question;
+import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -31,6 +34,9 @@ import java.util.List;
 import java.util.Locale;
 
 public class KoZnaZnaFragment extends Fragment {
+
+    private static final String TAG = "KoZnaZnaFragment";
+    private static final String GAME_TYPE = "KO_ZNA_ZNA";
 
     private static final int QUESTION_TIME = 5000;
     private static final int POINTS_CORRECT = 10;
@@ -50,6 +56,10 @@ public class KoZnaZnaFragment extends Fragment {
     private int currentQuestionIndex = 0;
     private int player1Points = 0;
     private int player2Points = 0;
+    private long gameStartedAtMs = 0L;
+    private boolean resultPersisted = false;
+
+    private final GameResultRepository gameResultRepository = new GameResultRepository();
 
     private boolean player1Answered = false;
     private boolean player2Answered = false;
@@ -122,6 +132,7 @@ public class KoZnaZnaFragment extends Fragment {
     }
 
     private void startGame() {
+        gameStartedAtMs = System.currentTimeMillis();
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
             String username = currentUser.getDisplayName();
@@ -264,6 +275,58 @@ public class KoZnaZnaFragment extends Fragment {
         }
         // Show final scores or navigate away
         setAnswerButtonsEnabled(false);
+        persistKoZnaZnaResult();
+    }
+
+    private void persistKoZnaZnaResult() {
+        if (resultPersisted) {
+            return;
+        }
+        resultPersisted = true;
+
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Log.e(TAG, "Cannot save Ko zna zna result: no authenticated user.");
+            return;
+        }
+
+        String player1Uid = currentUser.getUid();
+        String player1Name = currentUser.getDisplayName();
+        if (player1Name == null || player1Name.trim().isEmpty()) {
+            player1Name = "Igrac 1";
+        }
+
+        long finishedAt = System.currentTimeMillis();
+        long durationMs = gameStartedAtMs > 0 ? Math.max(0L, finishedAt - gameStartedAtMs) : 0L;
+        int askedQuestions = questions != null ? questions.size() : currentQuestionIndex;
+
+        GameResult result = new GameResult(
+                GAME_TYPE,
+                player1Uid,
+                player1Name,
+                player1Points,
+                null,
+                null,
+                player2Points,
+                player1Uid,
+                finishedAt,
+                durationMs,
+                askedQuestions
+        );
+
+        gameResultRepository.saveGameResult(result)
+                .addOnSuccessListener(documentReference -> {
+                    Log.d(TAG, "Ko zna zna result saved to Firestore: " + documentReference.getId());
+                    if (getContext() != null) {
+                        Toast.makeText(getContext(), "Rezultat sacuvan.", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save Ko zna zna result to Firestore", e);
+                    if (getContext() != null) {
+                        Toast.makeText(getContext(), "Neuspesno cuvanje rezultata.", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     @Override

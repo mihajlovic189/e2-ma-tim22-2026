@@ -3,6 +3,7 @@ package com.example.slagalicaapp.ui.fragments;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,6 +11,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -17,7 +19,9 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.slagalicaapp.R;
+import com.example.slagalicaapp.model.GameResult;
 import com.example.slagalicaapp.model.SpojniceGame;
+import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -34,6 +38,10 @@ import java.util.Map;
 
 public class SpojniceFragment extends Fragment {
 
+    private static final String TAG = "SpojniceFragment";
+    private static final String GAME_TYPE = "SPOJNICE";
+    private static final String RESULTS_COLLECTION = "spojnice_results";
+
     private static final int ROUND_TIME = 30000;
     private static final int POINTS_PER_PAIR = 2;
     private static final int NUMBER_OF_GAMES = 2;
@@ -49,12 +57,15 @@ public class SpojniceFragment extends Fragment {
     private int player1Points = 0;
     private int player2Points = 0;
     private int currentPlayer = 1; // Player 1 starts the first round
+    private long gameStartedAtMs = 0L;
+    private boolean resultPersisted = false;
 
     private Button selectedLeft = null;
     private Button selectedRight = null;
     private Map<Button, Button> connections = new HashMap<>();
     private List<Button> leftButtons = new ArrayList<>();
     private List<Button> rightButtons = new ArrayList<>();
+    private final GameResultRepository gameResultRepository = new GameResultRepository();
 
     public SpojniceFragment() {
     }
@@ -122,6 +133,9 @@ public class SpojniceFragment extends Fragment {
 
     private void startRound() {
         if (currentRound < games.size()) {
+            if (currentRound == 0 && gameStartedAtMs == 0L) {
+                gameStartedAtMs = System.currentTimeMillis();
+            }
             roundInfo.setText("Runda " + (currentRound + 1) + " / " + games.size());
             currentPlayer = (currentRound % 2) + 1; // Alternate starting player
             setupBoard();
@@ -338,6 +352,63 @@ public class SpojniceFragment extends Fragment {
         }
         currentPlayerInfo.setText("Kraj igre!");
         setButtonsEnabled(false); // Disable all connection buttons
+        persistSpojniceResult();
+    }
+
+    private void persistSpojniceResult() {
+        if (resultPersisted) {
+            return;
+        }
+        resultPersisted = true;
+
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Log.e(TAG, "Cannot save Spojnice result: no authenticated user.");
+            return;
+        }
+
+        String player1Uid = currentUser.getUid();
+        String player1Name = player1Username.getText() != null ? player1Username.getText().toString() : "Igrac 1";
+        String player2Name = player2Username.getText() != null ? player2Username.getText().toString() : "Igrac 2";
+
+        String winnerUid;
+        if (player1Points > player2Points) {
+            winnerUid = player1Uid;
+        } else {
+            winnerUid = null;
+        }
+
+        long finishedAt = System.currentTimeMillis();
+        long durationMs = gameStartedAtMs > 0 ? Math.max(0L, finishedAt - gameStartedAtMs) : 0L;
+        int roundsPlayed = games != null ? games.size() : currentRound;
+
+        GameResult result = new GameResult(
+                GAME_TYPE,
+                player1Uid,
+                player1Name,
+                player1Points,
+                null,
+                player2Name,
+                player2Points,
+                winnerUid,
+                finishedAt,
+                durationMs,
+                roundsPlayed
+        );
+
+        gameResultRepository.saveGameResult(result, RESULTS_COLLECTION)
+                .addOnSuccessListener(documentReference -> {
+                    Log.d(TAG, "Spojnice result saved to Firestore: " + documentReference.getId());
+                    if (getContext() != null) {
+                        Toast.makeText(getContext(), "Rezultat sacuvan.", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save Spojnice result to Firestore", e);
+                    if (getContext() != null) {
+                        Toast.makeText(getContext(), "Neuspesno cuvanje rezultata.", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     @Override
