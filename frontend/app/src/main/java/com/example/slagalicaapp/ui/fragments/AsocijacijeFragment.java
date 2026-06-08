@@ -11,13 +11,24 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.databinding.FragmentAsocijacijeBinding;
+import com.example.slagalicaapp.model.GameResult;
+import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.example.slagalicaapp.ui.header.GameHeaderController;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public class AsocijacijeFragment extends Fragment {
 
+    private static final String GAME_TYPE = "ASOCIJACIJE";
+
+    private final GameResultRepository gameResultRepository = new GameResultRepository();
+    private long gameStartedAtMs = 0L;
+    private boolean resultPersisted = false;
+    private int player1Points = 0;
+    private int player2Points = 0;
     private static final String TAG = "AsocijacijeFragment";
     private FragmentAsocijacijeBinding binding;
     private Map<Integer, String> gameWordsMap;
@@ -44,6 +55,8 @@ public class AsocijacijeFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+
+        persistAsocijacijeResult();
         // Vazno: zaustaviti CountDownTimer da ne pravi memory leak
         if (headerController != null) {
             headerController.release();
@@ -59,6 +72,7 @@ public class AsocijacijeFragment extends Fragment {
         headerController.setPlayerNames("IGRAČ 1", "IGRAČ 2");
         headerController.setOnTimerFinishedListener(this::onTimerExpired);
         headerController.start();
+        gameStartedAtMs = System.currentTimeMillis();
         Log.d(TAG, "Asocijacije: tajmer pokrenut na 60s.");
     }
 
@@ -71,6 +85,55 @@ public class AsocijacijeFragment extends Fragment {
         }
         // Onemoguci dalji unos kad istekne vreme.
         disableAllGameButtons();
+        persistAsocijacijeResult();
+    }
+
+    private void persistAsocijacijeResult() {
+        if (resultPersisted) return;
+        resultPersisted = true;
+
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Log.e(TAG, "Cannot save Asocijacije result: no authenticated user.");
+            return;
+        }
+
+        String player1Uid = currentUser.getUid();
+        String player1Name = currentUser.getDisplayName();
+        if (player1Name == null || player1Name.trim().isEmpty()) {
+            player1Name = "Igrac 1";
+        }
+
+        long finishedAt = System.currentTimeMillis();
+        long durationMs = gameStartedAtMs > 0
+                ? Math.max(0L, finishedAt - gameStartedAtMs)
+                : 0L;
+
+        GameResult result = new GameResult(
+                GAME_TYPE,
+                player1Uid,
+                player1Name,
+                player1Points,
+                null,       // player2Uid
+                null,       // player2Name
+                player2Points,
+                player1Uid, // winnerId
+                finishedAt,
+                durationMs,
+                0           // askedQuestions — nema smisla za Asocijacije, stavi 0 ili broj otvorenih polja
+        );
+
+        gameResultRepository.saveGameResult(result, "asocijacije_results")
+                .addOnSuccessListener(ref -> {
+                    Log.d(TAG, "Asocijacije result saved: " + ref.getId());
+                    if (getContext() != null)
+                        Toast.makeText(getContext(), "Rezultat sacuvan.", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save Asocijacije result", e);
+                    if (getContext() != null)
+                        Toast.makeText(getContext(), "Neuspesno cuvanje rezultata.", Toast.LENGTH_SHORT).show();
+                });
     }
 
     private void disableAllGameButtons() {
