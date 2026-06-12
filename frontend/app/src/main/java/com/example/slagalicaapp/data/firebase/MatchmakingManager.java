@@ -1,5 +1,6 @@
 package com.example.slagalicaapp.data.firebase;
 
+import androidx.annotation.NonNull;
 import com.google.firebase.database.*;
 
 import java.util.ArrayList;
@@ -39,7 +40,7 @@ public class MatchmakingManager {
                     .limitToFirst(1)
                     .addListenerForSingleValueEvent(new ValueEventListener() {
                         @Override
-                        public void onDataChange(DataSnapshot snapshot) {
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
                             if (snapshot.exists()) {
                                 DataSnapshot existing = snapshot.getChildren().iterator().next();
                                 String roomId = existing.child("roomId").getValue(String.class);
@@ -50,7 +51,9 @@ public class MatchmakingManager {
                                     listener.onMatchFound(roomId, 1);
                                     return;
                                 }
-                                attachQueueListener(queueRef.child(key), roomId, 1);
+                                if (key != null) {
+                                    attachQueueListener(queueRef.child(key), roomId);
+                                }
                                 listener.onWaiting();
                                 return;
                             }
@@ -58,7 +61,7 @@ public class MatchmakingManager {
                         }
 
                         @Override
-                        public void onCancelled(DatabaseError error) {
+                        public void onCancelled(@NonNull DatabaseError error) {
                             listener.onError(error.getMessage());
                         }
                     });
@@ -71,7 +74,7 @@ public class MatchmakingManager {
         queueRef.orderByChild("status").equalTo("waiting")
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
-                    public void onDataChange(DataSnapshot snapshot) {
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
                         DataSnapshot waitingEntry = null;
                         for (DataSnapshot child : snapshot.getChildren()) {
                             String otherUid = child.child("playerUid").getValue(String.class);
@@ -85,8 +88,10 @@ public class MatchmakingManager {
                         if (waitingEntry != null) {
                             String roomId = waitingEntry.child("roomId").getValue(String.class);
                             String opponentKey = waitingEntry.getKey();
-                            queueRef.child(opponentKey).child("status").setValue("matched");
-                            createRoom(roomId, 2);
+                            if (opponentKey != null) {
+                                queueRef.child(opponentKey).child("status").setValue("matched");
+                                createRoom(roomId, 2);
+                            }
                         } else {
                             String roomId = db.child("rooms").child(gameType).push().getKey();
                             joinQueue(queueRef, roomId);
@@ -95,7 +100,7 @@ public class MatchmakingManager {
                     }
 
                     @Override
-                    public void onCancelled(DatabaseError error) {
+                    public void onCancelled(@NonNull DatabaseError error) {
                         listener.onError(error.getMessage());
                     }
                 });
@@ -112,23 +117,23 @@ public class MatchmakingManager {
 
         createRoom(roomId, 1);
 
-        attachQueueListener(myEntry, roomId, 1);
+        attachQueueListener(myEntry, roomId);
     }
 
-    private void attachQueueListener(DatabaseReference entryRef, String roomId, int playerNumber) {
+    private void attachQueueListener(DatabaseReference entryRef, String roomId) {
         queueListener = new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot snapshot) {
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
                 String status = snapshot.child("status").getValue(String.class);
                 if ("matched".equals(status)) {
                     stopListening();
                     if (roomId != null) {
-                        listener.onMatchFound(roomId, playerNumber);
+                        listener.onMatchFound(roomId, 1);
                     }
                 }
             }
             @Override
-            public void onCancelled(DatabaseError error) {
+            public void onCancelled(@NonNull DatabaseError error) {
                 listener.onError(error.getMessage());
             }
         };
@@ -137,12 +142,14 @@ public class MatchmakingManager {
 
     private void createRoom(String roomId, int playerNumber) {
         DatabaseReference roomRef = db.child("rooms").child(gameType).child(roomId);
+        long startedAt = System.currentTimeMillis();
 
         if (playerNumber == 1) {
             roomRef.child("status").setValue("waiting");
             roomRef.child("player1").setValue(playerName);
             roomRef.child("player1Uid").setValue(playerUid);
             roomRef.child("currentRound").setValue(1);
+            roomRef.child("startedAt").setValue(startedAt);
             roomRef.child("scores").child("player1").setValue(0);
             roomRef.child("scores").child("player2").setValue(0);
 
@@ -151,7 +158,7 @@ public class MatchmakingManager {
                 roomRef.child("currentStep").setValue(-1);
                 roomRef.child("roundStatus").setValue("playing");
                 seedKorakRoundsFromPool(roomRef);
-                seedMojBrojRoom(roomId, playerName, null, playerUid, null);
+                seedMojBrojRoom(roomId, playerName, null, playerUid, null, startedAt);
             } else if (gameType.equals("MOJ_BROJ")) {
                 roomRef.child("activePlayer").setValue(1);
                 roomRef.child("roundStatus").setValue("playing");
@@ -163,7 +170,7 @@ public class MatchmakingManager {
             roomRef.child("player2Uid").setValue(playerUid);
             roomRef.child("status").setValue("playing");
             if (gameType.equals("KORAK_PO_KORAK")) {
-                seedMojBrojRoom(roomId, null, playerName, null, playerUid);
+                seedMojBrojRoom(roomId, null, playerName, null, playerUid, null);
             }
             listener.onMatchFound(roomId, 2);
         }
@@ -173,7 +180,7 @@ public class MatchmakingManager {
         DatabaseReference poolRef = db.child("korak_pool");
         poolRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot snapshot) {
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
                 List<DataSnapshot> items = new ArrayList<>();
                 for (DataSnapshot child : snapshot.getChildren()) {
                     items.add(child);
@@ -189,7 +196,7 @@ public class MatchmakingManager {
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {}
+            public void onCancelled(@NonNull DatabaseError error) {}
         });
     }
 
@@ -208,12 +215,13 @@ public class MatchmakingManager {
         }
     }
 
-    private void seedMojBrojRoom(String roomId, String p1, String p2, String p1Uid, String p2Uid) {
+    private void seedMojBrojRoom(String roomId, String p1, String p2, String p1Uid, String p2Uid, Long startedAt) {
         DatabaseReference mbRef = db.child("rooms").child("MOJ_BROJ").child(roomId);
         if (p1 != null) mbRef.child("player1").setValue(p1);
         if (p2 != null) mbRef.child("player2").setValue(p2);
         if (p1Uid != null) mbRef.child("player1Uid").setValue(p1Uid);
         if (p2Uid != null) mbRef.child("player2Uid").setValue(p2Uid);
+        if (startedAt != null) mbRef.child("startedAt").setValue(startedAt);
         mbRef.child("status").setValue(p2 != null ? "playing" : "waiting");
         mbRef.child("currentRound").setValue(1);
         mbRef.child("activePlayer").setValue(1);
@@ -233,6 +241,7 @@ public class MatchmakingManager {
         }
     }
 
+    @SuppressWarnings("unused")
     public void cancelSearch() {
         stopListening();
         if (myQueueKey != null) {

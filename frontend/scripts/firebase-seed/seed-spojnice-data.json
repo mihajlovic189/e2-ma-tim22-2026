@@ -1,0 +1,35 @@
+{
+  "Spojnice": {
+    "game1": {
+      "description": "Poveži izvođače i nazive pesama",
+      "pairs": {
+        "Miroslav Ilić": "Zašto su dani tužni",
+        "Bajaga": "442 do Beograda",
+        "Dino Merlin": "Kad zamirišu jorgovani",
+        "Bijelo Dugme": "Lipe cvatu",
+        "Tozovac": "Niz polja se proteže"
+      }
+    },
+    "game2": {
+      "description": "Poveži države i glavne gradove",
+      "pairs": {
+        "Srbija": "Beograd",
+        "Francuska": "Pariz",
+        "Nemačka": "Berlin",
+        "Italija": "Rim",
+        "Španija": "Madrid"
+      }
+    },
+    "game3": {
+      "description": "Poveži pisce i njihova dela",
+      "pairs": {
+        "Ivo Andrić": "Na Drini ćuprija",
+        "Meša Selimović": "Derviš i smrt",
+        "Danilo Kiš": "Grobnica za Borisa Davidoviča",
+        "Miloš Crnjanski": "Seobe",
+        "Dobrica Ćosić": "Koreni"
+      }
+    }
+  }
+}
+

@@ -1,0 +1,105 @@
+{
+  "KoZnaZna": {
+    "question1": {
+      "questionText": "Koji je glavni grad Srbije?",
+      "options": [
+        "Beograd",
+        "Novi Sad",
+        "Niš",
+        "Kragujevac"
+      ],
+      "correctAnswerIndex": 0
+    },
+    "question2": {
+      "questionText": "Koja je najduža reka na svetu?",
+      "options": [
+        "Nil",
+        "Amazon",
+        "Jangce",
+        "Misisipi"
+      ],
+      "correctAnswerIndex": 1
+    },
+    "question3": {
+      "questionText": "Ko je napisao 'Na Drini ćuprija'?",
+      "options": [
+        "Meša Selimović",
+        "Danilo Kiš",
+        "Ivo Andrić",
+        "Miloš Crnjanski"
+      ],
+      "correctAnswerIndex": 2
+    },
+    "question4": {
+      "questionText": "Koja planeta je najbliža Suncu?",
+      "options": [
+        "Venera",
+        "Mars",
+        "Merkur",
+        "Zemlja"
+      ],
+      "correctAnswerIndex": 2
+    },
+    "question5": {
+      "questionText": "U kom gradu se nalazi Krivi toranj?",
+      "options": [
+        "Rim",
+        "Piza",
+        "Firenca",
+        "Venecija"
+      ],
+      "correctAnswerIndex": 1
+    },
+    "question6": {
+      "questionText": "Kako se zove najveći okean na Zemlji?",
+      "options": [
+        "Atlantski okean",
+        "Indijski okean",
+        "Tihi okean",
+        "Severni ledeni okean"
+      ],
+      "correctAnswerIndex": 2
+    },
+    "question7": {
+      "questionText": "Ko je naslikao Mona Lizu?",
+      "options": [
+        "Vinsent van Gog",
+        "Pablo Pikaso",
+        "Leonardo da Vinči",
+        "Mikelanđelo"
+      ],
+      "correctAnswerIndex": 2
+    },
+    "question8": {
+      "questionText": "Koji je najviši vrh na svetu?",
+      "options": [
+        "Mont Everest",
+        "K2",
+        "Kangčendžunga",
+        "Lhotse"
+      ],
+      "correctAnswerIndex": 0
+    },
+    "question9": {
+      "questionText": "Koja životinja je poznata kao 'kralj džungle'?",
+      "options": [
+        "Tigar",
+        "Lav",
+        "Slon",
+        "Žirafa"
+      ],
+      "correctAnswerIndex": 1
+    },
+    "question10": {
+      "questionText": "Koji je hemijski simbol za zlato?",
+      "options": [
+        "Ag",
+        "Au",
+        "Fe",
+        "Pb"
+      ],
+      "correctAnswerIndex": 1
+    }
+  }
+}
+

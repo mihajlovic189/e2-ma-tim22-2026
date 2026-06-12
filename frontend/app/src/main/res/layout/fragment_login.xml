@@ -2,6 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:background="@color/bg"
     android:fillViewport="true">
 
@@ -44,14 +45,29 @@
             android:textColor="@color/text"
             android:textColorHint="@color/hint" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnLogin"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:backgroundTint="@color/primary"
+            android:textSize="20sp"
+            android:radius="14dp"
             android:text="Prijavi se"
-            android:textColor="@color/text" />
+            android:textColor="@color/text"
+            app:backgroundTint="@color/primary"
+            app:cornerRadius="14dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/goGuest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="26dp"
+            android:textSize="20sp"
+            android:radius="14dp"
+            android:text="Igraj kao gost"
+            android:textColor="@color/text"
+            app:backgroundTint="#1E293B"
+            app:cornerRadius="14dp"/>
 
         <TextView
             android:id="@+id/goRegister"
@@ -60,16 +76,14 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="26dp"
             android:text="Nemaš nalog? Registruj se"
-            android:textColor="@color/hint" />
+            android:textColor="@color/hint"
+            android:textSize="20sp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/zaobljeni_klik_feedback"
+            android:padding="8dp"/>
 
-        <TextView
-            android:id="@+id/goGuest"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="26dp"
-            android:text="Igraj kao gost"
-            android:textColor="@color/hint" />
+
 
     </LinearLayout>
 
