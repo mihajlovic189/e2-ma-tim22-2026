@@ -11,6 +11,7 @@ import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.ui.fragments.KorakPoKorakFragment;
 import com.example.slagalicaapp.ui.fragments.MojBrojFragment;
+import com.example.slagalicaapp.ui.fragments.AsocijacijeMultiplayerFragment;
 import com.example.slagalicaapp.ui.fragments.KoZnaZnaMultiplayerFragment;
 import com.example.slagalicaapp.ui.fragments.SkockoMultiplayerFragment;
 import com.example.slagalicaapp.ui.fragments.SpojniceMultiplayerFragment;
@@ -35,7 +36,8 @@ public class GameActivity extends AppCompatActivity {
     public static final String GAME_MOJ_BROJ = "MOJ_BROJ";
     public static final String GAME_SKOCKO      = "SKOCKO";
     public static final String GAME_KO_ZNA_ZNA = "KO_ZNA_ZNA";
-    public static final String GAME_SPOJNICE   = "SPOJNICE";
+    public static final String GAME_SPOJNICE    = "SPOJNICE";
+    public static final String GAME_ASOCIJACIJE = "ASOCIJACIJE";
 
     private String roomId;
     private int playerNumber;
@@ -144,6 +146,8 @@ public class GameActivity extends AppCompatActivity {
             fragment = new KoZnaZnaMultiplayerFragment();
         } else if (GAME_SPOJNICE.equals(gameType)) {
             fragment = new SpojniceMultiplayerFragment();
+        } else if (GAME_ASOCIJACIJE.equals(gameType)) {
+            fragment = new AsocijacijeMultiplayerFragment();
         } else {
             fragment = new KorakPoKorakFragment();
         }
@@ -170,6 +174,8 @@ public class GameActivity extends AppCompatActivity {
             updateForfeitRoom(GAME_KO_ZNA_ZNA, playerKey, winnerKey, finishedAt);
         } else if (GAME_SPOJNICE.equals(currentGameType)) {
             updateForfeitRoom(GAME_SPOJNICE, playerKey, winnerKey, finishedAt);
+        } else if (GAME_ASOCIJACIJE.equals(currentGameType)) {
+            updateForfeitRoom(GAME_ASOCIJACIJE, playerKey, winnerKey, finishedAt);
         } else {
             updateForfeitRoom(GAME_KORAK, playerKey, winnerKey, finishedAt);
             updateForfeitRoom(GAME_MOJ_BROJ, playerKey, winnerKey, finishedAt);
@@ -213,11 +219,13 @@ public class GameActivity extends AppCompatActivity {
 
         boolean needsRtdbCleanup = GAME_SKOCKO.equals(resultGameType)
                 || GAME_KO_ZNA_ZNA.equals(resultGameType)
-                || GAME_SPOJNICE.equals(resultGameType);
+                || GAME_SPOJNICE.equals(resultGameType)
+                || GAME_ASOCIJACIJE.equals(resultGameType);
         String firestoreCollection;
-        if (GAME_SKOCKO.equals(resultGameType))      firestoreCollection = "skocko_results";
-        else if (GAME_SPOJNICE.equals(resultGameType)) firestoreCollection = "spojnice_results";
-        else                                           firestoreCollection = "ko_zna_zna_results";
+        if (GAME_SKOCKO.equals(resultGameType))          firestoreCollection = "skocko_results";
+        else if (GAME_SPOJNICE.equals(resultGameType))   firestoreCollection = "spojnice_results";
+        else if (GAME_ASOCIJACIJE.equals(resultGameType)) firestoreCollection = "asocijacije_results";
+        else                                              firestoreCollection = "ko_zna_zna_results";
 
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override

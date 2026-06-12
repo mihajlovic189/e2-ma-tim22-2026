@@ -1,6 +1,8 @@
 package com.example.slagalicaapp.data.firebase;
 
 import androidx.annotation.NonNull;
+import com.example.slagalicaapp.game.asocijacije.Asocijacija;
+import com.example.slagalicaapp.game.asocijacije.AsocijacijeRepository;
 import com.google.firebase.database.*;
 
 import java.util.ArrayList;
@@ -188,6 +190,9 @@ public class MatchmakingManager {
                 roomRef.child("currentRound").setValue(0);
                 roomRef.child("currentPlayer").setValue(1);
                 seedSpojniceGames(roomRef);
+            } else if (gameType.equals("ASOCIJACIJE")) {
+                seedAsocijacije(roomRef);
+                roomRef.child("activePlayer").setValue(1);
             }
         } else {
             roomRef.child("player2").setValue(playerName);
@@ -206,12 +211,27 @@ public class MatchmakingManager {
                 roomRef.child("questionStartedAt").setValue(now + 2000L);
             } else if (gameType.equals("SPOJNICE")) {
                 roomRef.child("turnEndsAt").setValue(System.currentTimeMillis() + 32_000L);
+            } else if (gameType.equals("ASOCIJACIJE")) {
+                roomRef.child("gameEndsAt").setValue(System.currentTimeMillis() + 122_000L);
             }
             listener.onMatchFound(roomId, 2);
         }
     }
 
     private static final long MAIN_SKOCKO_DURATION_MS = 30_000L;
+
+    private void seedAsocijacije(DatabaseReference roomRef) {
+        Asocijacija a = AsocijacijeRepository.getNasumicnaAsocijacija();
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        for (java.util.Map.Entry<String, String> e : a.polja.entrySet()) {
+            data.put("fields/" + e.getKey(), e.getValue());
+        }
+        for (java.util.Map.Entry<String, String> e : a.resenjaKolona.entrySet()) {
+            data.put("columnSolutions/" + e.getKey(), e.getValue());
+        }
+        data.put("finalSolution", a.konacnoResenje);
+        roomRef.updateChildren(data);
+    }
 
     private void seedSpojniceGames(DatabaseReference roomRef) {
         db.child("Spojnice").addListenerForSingleValueEvent(new ValueEventListener() {

@@ -49,11 +49,11 @@ public class HomeFragment extends Fragment {
                         .commit());
 
 
-        binding.btnAsocijacija.setOnClickListener(v ->
-                getParentFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, new AsocijacijeFragment())
-                        .addToBackStack(null)
-                        .commit());
+        binding.btnAsocijacija.setOnClickListener(v -> {
+            binding.btnAsocijacija.setEnabled(false);
+            Toast.makeText(getContext(), "Pokrecemo Asocijacije matchmaking...", Toast.LENGTH_SHORT).show();
+            startMatchmaking(GameActivity.GAME_ASOCIJACIJE);
+        });
 
         binding.btnSkocko.setOnClickListener(v -> {
             binding.btnSkocko.setEnabled(false);
@@ -149,6 +149,8 @@ public class HomeFragment extends Fragment {
         } else if (GameActivity.GAME_SPOJNICE.equals(gameType)) {
             View btn = binding.getRoot().findViewById(R.id.btnSpojnice);
             if (btn != null) btn.setEnabled(true);
+        } else if (GameActivity.GAME_ASOCIJACIJE.equals(gameType)) {
+            binding.btnAsocijacija.setEnabled(true);
         } else {
             binding.btnIgrajOnline.setEnabled(true);
         }
