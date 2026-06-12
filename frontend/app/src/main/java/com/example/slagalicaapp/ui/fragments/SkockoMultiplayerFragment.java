@@ -118,8 +118,13 @@ public class SkockoMultiplayerFragment extends Fragment {
             }
 
             @Override
-            public void onPhaseChanged(String phase, long phaseEndsAt) {
-                requireActivity().runOnUiThread(() -> handlePhaseChange(phase, phaseEndsAt));
+            public void onPhaseChanged(String phase, long phaseEndsAt, int p1Sc, int p2Sc) {
+                requireActivity().runOnUiThread(() -> {
+                    p1Score = p1Sc;
+                    p2Score = p2Sc;
+                    if (headerController != null) headerController.setScores(p1Score, p2Score);
+                    handlePhaseChange(phase, phaseEndsAt);
+                });
             }
 
             @Override

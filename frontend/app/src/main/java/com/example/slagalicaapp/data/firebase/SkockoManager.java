@@ -9,7 +9,7 @@ public class SkockoManager {
 
     public interface SkockoListener {
         void onRoomReady(String p1Name, String p2Name, String secret1, String secret2, int p1Score, int p2Score);
-        void onPhaseChanged(String phase, long phaseEndsAt);
+        void onPhaseChanged(String phase, long phaseEndsAt, int p1Score, int p2Score);
         void onGuessAdded(String roundKey, int guessIndex, int[] symbols, int reds, int yellows);
         void onGameFinished(int p1Score, int p2Score, String forfeitBy);
         void onError(String message);
@@ -60,7 +60,9 @@ public class SkockoManager {
                 if (phase != null && !phase.equals(lastPhase)) {
                     lastPhase = phase;
                     Long endsAt = snapshot.child("phaseEndsAt").getValue(Long.class);
-                    listener.onPhaseChanged(phase, endsAt != null ? endsAt : 0L);
+                    int sc1 = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
+                    int sc2 = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
+                    listener.onPhaseChanged(phase, endsAt != null ? endsAt : 0L, sc1, sc2);
                 }
 
                 processRoundGuesses(snapshot, "round1");
