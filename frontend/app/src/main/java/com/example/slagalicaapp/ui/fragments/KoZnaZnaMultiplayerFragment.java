@@ -55,6 +55,8 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
     private boolean p1Answered = false;
     private boolean p2Answered = false;
     private boolean evaluated  = false;
+    private long p1AnswerTime = 0; // ms epoch; set on click for local player, on arrival for remote
+    private long p2AnswerTime = 0;
 
     private CountDownTimer questionTimer;
     private final Handler handler = new Handler();
@@ -130,6 +132,8 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
             p2Answered = false;
             evaluated  = false;
             myLocalAnswer = -1;
+            p1AnswerTime = 0;
+            p2AnswerTime = 0;
 
             resetButtonColors();
             setAnswersEnabled(true);
@@ -154,8 +158,14 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
     @Override
     public void onAnswerSubmitted(int playerNum, int answerIndex) {
         requireActivity().runOnUiThread(() -> {
-            if (playerNum == 1) { p1TrackedAnswer = answerIndex; p1Answered = true; }
-            else                { p2TrackedAnswer = answerIndex; p2Answered = true; }
+            long now = System.currentTimeMillis();
+            if (playerNum == 1) {
+                p1TrackedAnswer = answerIndex; p1Answered = true;
+                if (p1AnswerTime == 0) p1AnswerTime = now; // don't override time set by local click
+            } else {
+                p2TrackedAnswer = answerIndex; p2Answered = true;
+                if (p2AnswerTime == 0) p2AnswerTime = now;
+            }
 
             if (isCoordinator && p1Answered && p2Answered) {
                 evaluateAndPublish();
@@ -243,11 +253,12 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         answerButtons[answerIndex].setBackgroundTintList(
                 ColorStateList.valueOf(Color.parseColor("#3B82F6"))); // blue — "submitted"
 
-        manager.submitAnswer(currentQuestionIndex, answerIndex);
+        // Record click time before Firebase round-trip
+        long now = System.currentTimeMillis();
+        if (myPlayerNumber == 1) { p1AnswerTime = now; p1TrackedAnswer = answerIndex; p1Answered = true; }
+        else                     { p2AnswerTime = now; p2TrackedAnswer = answerIndex; p2Answered = true; }
 
-        // Track locally for coordinator evaluation
-        if (myPlayerNumber == 1) { p1TrackedAnswer = answerIndex; p1Answered = true; }
-        else                     { p2TrackedAnswer = answerIndex; p2Answered = true; }
+        manager.submitAnswer(currentQuestionIndex, answerIndex);
 
         if (isCoordinator && p1Answered && p2Answered) {
             evaluateAndPublish();
@@ -267,12 +278,23 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         int newP1Score = p1Score;
         int newP2Score = p2Score;
 
-        if (p1Answered) {
-            newP1Score += (p1TrackedAnswer == correct) ? POINTS_CORRECT : POINTS_INCORRECT;
+        boolean p1Correct = p1Answered && (p1TrackedAnswer == correct);
+        boolean p2Correct = p2Answered && (p2TrackedAnswer == correct);
+
+        // Only the FIRST correct answerer gets POINTS_CORRECT; wrong answers always lose POINTS_INCORRECT
+        if (p1Correct && p2Correct) {
+            boolean p1First = (p1AnswerTime > 0 && p2AnswerTime > 0)
+                    ? p1AnswerTime <= p2AnswerTime
+                    : (p1AnswerTime > 0); // if only one time is known, they answered first
+            if (p1First) newP1Score += POINTS_CORRECT;
+            else         newP2Score += POINTS_CORRECT;
+        } else if (p1Correct) {
+            newP1Score += POINTS_CORRECT;
+        } else if (p2Correct) {
+            newP2Score += POINTS_CORRECT;
         }
-        if (p2Answered) {
-            newP2Score += (p2TrackedAnswer == correct) ? POINTS_CORRECT : POINTS_INCORRECT;
-        }
+        if (p1Answered && !p1Correct) newP1Score += POINTS_INCORRECT;
+        if (p2Answered && !p2Correct) newP2Score += POINTS_INCORRECT;
 
         manager.publishQuestionResult(currentQuestionIndex,
                 p1Answered ? p1TrackedAnswer : -1,

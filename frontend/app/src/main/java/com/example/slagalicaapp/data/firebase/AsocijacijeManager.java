@@ -17,6 +17,8 @@ public class AsocijacijeManager {
 
         /** Fires on every meaningful board-state change. */
         void onStateChanged(int activePlayer,
+                            String turnPhase,
+                            long turnEndsAt,
                             Set<String> openedFields,
                             Map<String, Integer> columnsSolvedBy,
                             int finalSolvedBy,
@@ -79,6 +81,12 @@ public class AsocijacijeManager {
                 Long apL = snapshot.child("activePlayer").getValue(Long.class);
                 int activePlayer = apL != null ? apL.intValue() : 1;
 
+                String turnPhase = snapshot.child("turnPhase").getValue(String.class);
+                if (turnPhase == null) turnPhase = "opening";
+
+                Long teL = snapshot.child("turnEndsAt").getValue(Long.class);
+                long turnEndsAt = teL != null ? teL : 0L;
+
                 Set<String> openedFields = new HashSet<>();
                 for (DataSnapshot f : snapshot.child("openedFields").getChildren()) {
                     openedFields.add(f.getKey());
@@ -96,8 +104,8 @@ public class AsocijacijeManager {
                 int p1Score = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
                 int p2Score = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
 
-                listener.onStateChanged(activePlayer, openedFields, columnsSolvedBy,
-                        finalSolvedBy, p1Score, p2Score);
+                listener.onStateChanged(activePlayer, turnPhase, turnEndsAt,
+                        openedFields, columnsSolvedBy, finalSolvedBy, p1Score, p2Score);
             }
 
             @Override

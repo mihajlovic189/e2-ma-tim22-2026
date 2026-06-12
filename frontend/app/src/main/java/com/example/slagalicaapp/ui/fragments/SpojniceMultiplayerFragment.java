@@ -44,6 +44,7 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
 
     private int selectedLeftIdx = -1;
     private final Set<Integer> myCorrectLeftIndices = new HashSet<>();
+    private final Set<Integer> myWrongLeftIndices   = new HashSet<>(); // permanently locked after one wrong attempt
     private final Set<Integer> usedRightPositions   = new HashSet<>();
 
     private int currentRound  = 0;
@@ -116,6 +117,7 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
             turnEnded     = false;
             selectedLeftIdx = -1;
             myCorrectLeftIndices.clear();
+            myWrongLeftIndices.clear();
             usedRightPositions.clear();
 
             leftItems       = new ArrayList<>(lefts);
@@ -240,7 +242,9 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
 
     private void onLeftClicked(int leftIdx) {
         if (!iAmActive || turnEnded) return;
-        if (resolvedThisRound.containsKey(leftIdx) || myCorrectLeftIndices.contains(leftIdx)) return;
+        if (resolvedThisRound.containsKey(leftIdx)
+                || myCorrectLeftIndices.contains(leftIdx)
+                || myWrongLeftIndices.contains(leftIdx)) return;
 
         // Deselect previous
         if (selectedLeftIdx >= 0 && selectedLeftIdx < leftButtons.size()) {
@@ -271,19 +275,23 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
                 handler.postDelayed(this::endTurn, 400);
             }
         } else {
-            applyTint(leftButtons.get(leftIdx),   "#EF4444");
-            applyTint(rightButtons.get(rightPos), "#EF4444");
-            handler.postDelayed(() -> {
-                if (!isAdded()) return;
-                leftButtons.get(leftIdx).setBackgroundTintList(null);
-                rightButtons.get(rightPos).setBackgroundTintList(null);
-            }, 500);
+            // Left button permanently locked red; right button freed for other left items
+            applyTint(leftButtons.get(leftIdx), "#EF4444");
+            leftButtons.get(leftIdx).setEnabled(false);
+            rightButtons.get(rightPos).setBackgroundTintList(null);
+            myWrongLeftIndices.add(leftIdx);
+
+            if (allPairsHandled()) {
+                handler.postDelayed(this::endTurn, 400);
+            }
         }
     }
 
     private boolean allPairsHandled() {
         for (int i = 0; i < leftItems.size(); i++) {
-            if (!resolvedThisRound.containsKey(i) && !myCorrectLeftIndices.contains(i)) return false;
+            if (!resolvedThisRound.containsKey(i)
+                    && !myCorrectLeftIndices.contains(i)
+                    && !myWrongLeftIndices.contains(i)) return false;
         }
         return true;
     }

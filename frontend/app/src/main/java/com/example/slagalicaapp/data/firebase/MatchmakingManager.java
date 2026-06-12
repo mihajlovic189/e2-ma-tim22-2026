@@ -193,6 +193,8 @@ public class MatchmakingManager {
             } else if (gameType.equals("ASOCIJACIJE")) {
                 seedAsocijacije(roomRef);
                 roomRef.child("activePlayer").setValue(1);
+                roomRef.child("turnPhase").setValue("opening");
+                roomRef.child("turnEndsAt").setValue(0L);
             }
         } else {
             roomRef.child("player2").setValue(playerName);
