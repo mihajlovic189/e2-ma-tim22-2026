@@ -251,6 +251,12 @@ public class AsocijacijeFragment extends Fragment {
                 sol.setBackgroundTintList(ColorStateList.valueOf(0xFFB0BEC5));
             }
         }
+
+        if (!board.isFinalSolved()) {
+            binding.etFinalSolution.setText(board.getFinalSolution());
+            binding.etFinalSolution.setEnabled(false);
+            binding.etFinalSolution.setBackgroundTintList(ColorStateList.valueOf(0xFFB0BEC5));
+        }
     }
 
     // ----------------- HEADER + TAJMER (120s za Asocijacije) -----------------

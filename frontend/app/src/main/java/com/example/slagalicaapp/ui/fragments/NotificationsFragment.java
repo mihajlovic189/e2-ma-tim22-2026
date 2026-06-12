@@ -5,13 +5,17 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.slagalicaapp.R;
+import com.example.slagalicaapp.repositories.NotificationRepository;
 import com.example.slagalicaapp.ui.adapters.NotificationAdapter;
-import java.util.Arrays;
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class NotificationsFragment extends Fragment {
@@ -21,6 +25,9 @@ public class NotificationsFragment extends Fragment {
     private RecyclerView rvLista1, rvLista2, rvLista3, rvLista4;
     private int trenutniFilter = NotificationAdapter.FILTER_SVE;
 
+    private NotificationRepository repo;
+    private NotificationAdapter adapterChat, adapterRanking, adapterRewards, adapterOther;
+
     public NotificationsFragment() {}
 
     @Override
@@ -28,17 +35,34 @@ public class NotificationsFragment extends Fragment {
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_notifications, container, false);
 
-        btnTab1 = view.findViewById(R.id.btnTab1);
-        btnTab2 = view.findViewById(R.id.btnTab2);
-        btnTab3 = view.findViewById(R.id.btnTab3);
-        btnTab4 = view.findViewById(R.id.btnTab4);
+        btnTab1   = view.findViewById(R.id.btnTab1);
+        btnTab2   = view.findViewById(R.id.btnTab2);
+        btnTab3   = view.findViewById(R.id.btnTab3);
+        btnTab4   = view.findViewById(R.id.btnTab4);
         btnFilter = view.findViewById(R.id.btnFilter);
-        rvLista1 = view.findViewById(R.id.rvLista1);
-        rvLista2 = view.findViewById(R.id.rvLista2);
-        rvLista3 = view.findViewById(R.id.rvLista3);
-        rvLista4 = view.findViewById(R.id.rvLista4);
+        rvLista1  = view.findViewById(R.id.rvLista1);
+        rvLista2  = view.findViewById(R.id.rvLista2);
+        rvLista3  = view.findViewById(R.id.rvLista3);
+        rvLista4  = view.findViewById(R.id.rvLista4);
 
-        setupListe();
+        repo = new NotificationRepository();
+
+        adapterChat    = new NotificationAdapter(repo);
+        adapterRanking = new NotificationAdapter(repo);
+        adapterRewards = new NotificationAdapter(repo);
+        adapterOther   = new NotificationAdapter(repo);
+
+        rvLista1.setLayoutManager(new LinearLayoutManager(getContext()));
+        rvLista2.setLayoutManager(new LinearLayoutManager(getContext()));
+        rvLista3.setLayoutManager(new LinearLayoutManager(getContext()));
+        rvLista4.setLayoutManager(new LinearLayoutManager(getContext()));
+
+        rvLista1.setAdapter(adapterChat);
+        rvLista2.setAdapter(adapterRanking);
+        rvLista3.setAdapter(adapterRewards);
+        rvLista4.setAdapter(adapterOther);
+
+        observeNotifications();
         setActiveTab(1);
 
         btnTab1.setOnClickListener(v -> setActiveTab(1));
@@ -48,7 +72,6 @@ public class NotificationsFragment extends Fragment {
 
         btnFilter.setOnClickListener(v -> {
             trenutniFilter = (trenutniFilter + 1) % 3;
-
             switch (trenutniFilter) {
                 case NotificationAdapter.FILTER_SVE:
                     btnFilter.setText("Sve");
@@ -66,47 +89,46 @@ public class NotificationsFragment extends Fragment {
                             android.content.res.ColorStateList.valueOf(0xFF4CAF50));
                     break;
             }
-
             getActiveAdapter().setFilter(trenutniFilter);
         });
 
         return view;
     }
 
-    private void setupListe() {
-        List<NotificationAdapter.NotificationItem> lista1 = Arrays.asList(
-                new NotificationAdapter.NotificationItem("Marko ti je poslao poruku", "Hej, igramo večeras?", "5 min"),
-                new NotificationAdapter.NotificationItem("Ana te izazvala", "Ana želi da igraš protiv nje.", "30 min"),
-                new NotificationAdapter.NotificationItem("Novi čet", "Pridružio si se novoj grupi.", "3 h")
-        );
+    private void observeNotifications() {
+        repo.getNotifikacije().observe(getViewLifecycleOwner(), items -> {
+            List<NotificationAdapter.NotificationItem> chat    = new ArrayList<>();
+            List<NotificationAdapter.NotificationItem> ranking = new ArrayList<>();
+            List<NotificationAdapter.NotificationItem> rewards = new ArrayList<>();
+            List<NotificationAdapter.NotificationItem> other   = new ArrayList<>();
 
-        List<NotificationAdapter.NotificationItem> lista2 = Arrays.asList(
-                new NotificationAdapter.NotificationItem("Nova rang lista", "Tvoj rang je porastao na #5!", "10 min"),
-                new NotificationAdapter.NotificationItem("Pao si na rang listi", "Neko te pretekao. Igraj više!", "2 h"),
-                new NotificationAdapter.NotificationItem("Top 10!", "Ušao si u top 10 igrača.", "1 dan")
-        );
+            for (NotificationRepository.NotifItem n : items) {
+                NotificationAdapter.NotificationItem ui =
+                        new NotificationAdapter.NotificationItem(
+                                n.id, n.naslov, n.opis, formatTime(n.timestamp), n.procitana);
+                switch (n.tip != null ? n.tip : "other") {
+                    case "chat":    chat.add(ui);    break;
+                    case "ranking": ranking.add(ui); break;
+                    case "rewards": rewards.add(ui); break;
+                    default:        other.add(ui);   break;
+                }
+            }
 
-        List<NotificationAdapter.NotificationItem> lista3 = Arrays.asList(
-                new NotificationAdapter.NotificationItem("Nova nagrada dostupna", "Osvoji nagradu za 5 pobeda.", "1 h"),
-                new NotificationAdapter.NotificationItem("Nagrada ističe", "Tvoja nagrada ističe za 24h!", "3 h"),
-                new NotificationAdapter.NotificationItem("Čestitamo!", "Dobio si zlatnu medalju.", "2 dana")
-        );
+            adapterChat.updateItems(chat);
+            adapterRanking.updateItems(ranking);
+            adapterRewards.updateItems(rewards);
+            adapterOther.updateItems(other);
+        });
+    }
 
-        List<NotificationAdapter.NotificationItem> lista4 = Arrays.asList(
-                new NotificationAdapter.NotificationItem("Ažuriranje aplikacije", "Nova verzija 2.1 je dostupna.", "1 dan"),
-                new NotificationAdapter.NotificationItem("Sigurnost naloga", "Prijavljivanje sa novog uređaja.", "2 dana"),
-                new NotificationAdapter.NotificationItem("Servis u toku", "Planirano održavanje u 02:00.", "3 dana")
-        );
-
-        rvLista1.setLayoutManager(new LinearLayoutManager(getContext()));
-        rvLista2.setLayoutManager(new LinearLayoutManager(getContext()));
-        rvLista3.setLayoutManager(new LinearLayoutManager(getContext()));
-        rvLista4.setLayoutManager(new LinearLayoutManager(getContext()));
-
-        rvLista1.setAdapter(new NotificationAdapter(lista1));
-        rvLista2.setAdapter(new NotificationAdapter(lista2));
-        rvLista3.setAdapter(new NotificationAdapter(lista3));
-        rvLista4.setAdapter(new NotificationAdapter(lista4));
+    private String formatTime(long timestamp) {
+        long diff = System.currentTimeMillis() - timestamp;
+        long minutes = diff / 60_000;
+        if (minutes < 1)   return "upravo";
+        if (minutes < 60)  return minutes + " min";
+        long hours = minutes / 60;
+        if (hours < 24)    return hours + " h";
+        return (hours / 24) + " dana";
     }
 
     private void setActiveTab(int tab) {
@@ -149,7 +171,6 @@ public class NotificationsFragment extends Fragment {
                 break;
         }
 
-        // Reset filter pri promjeni taba
         trenutniFilter = NotificationAdapter.FILTER_SVE;
         btnFilter.setText("Sve");
         btnFilter.setBackgroundTintList(
@@ -157,12 +178,9 @@ public class NotificationsFragment extends Fragment {
     }
 
     private NotificationAdapter getActiveAdapter() {
-        if (rvLista1.getVisibility() == View.VISIBLE)
-            return (NotificationAdapter) rvLista1.getAdapter();
-        if (rvLista2.getVisibility() == View.VISIBLE)
-            return (NotificationAdapter) rvLista2.getAdapter();
-        if (rvLista3.getVisibility() == View.VISIBLE)
-            return (NotificationAdapter) rvLista3.getAdapter();
-        return (NotificationAdapter) rvLista4.getAdapter();
+        if (rvLista1.getVisibility() == View.VISIBLE) return adapterChat;
+        if (rvLista2.getVisibility() == View.VISIBLE) return adapterRanking;
+        if (rvLista3.getVisibility() == View.VISIBLE) return adapterRewards;
+        return adapterOther;
     }
 }
