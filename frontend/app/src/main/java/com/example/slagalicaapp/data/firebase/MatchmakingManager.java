@@ -47,8 +47,9 @@ public class MatchmakingManager {
                                 String status = existing.child("status").getValue(String.class);
                                 String key = existing.getKey();
                                 myQueueKey = key;
+
                                 if ("matched".equals(status) && roomId != null) {
-                                    listener.onMatchFound(roomId, 1);
+                                    removeFromQueueAndNotify(roomId, 1);
                                     return;
                                 }
                                 if (key != null) {
@@ -74,7 +75,7 @@ public class MatchmakingManager {
         queueRef.orderByChild("status").equalTo("waiting")
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
                         DataSnapshot waitingEntry = null;
                         for (DataSnapshot child : snapshot.getChildren()) {
                             String otherUid = child.child("playerUid").getValue(String.class);
@@ -95,7 +96,6 @@ public class MatchmakingManager {
                         } else {
                             String roomId = db.child("rooms").child(gameType).push().getKey();
                             joinQueue(queueRef, roomId);
-                            listener.onWaiting();
                         }
                     }
 
@@ -116,8 +116,8 @@ public class MatchmakingManager {
         myEntry.child("status").setValue("waiting");
 
         createRoom(roomId, 1);
-
         attachQueueListener(myEntry, roomId);
+        listener.onWaiting();
     }
 
     private void attachQueueListener(DatabaseReference entryRef, String roomId) {
@@ -127,9 +127,7 @@ public class MatchmakingManager {
                 String status = snapshot.child("status").getValue(String.class);
                 if ("matched".equals(status)) {
                     stopListening();
-                    if (roomId != null) {
-                        listener.onMatchFound(roomId, 1);
-                    }
+                    removeFromQueueAndNotify(roomId, 1);
                 }
             }
             @Override
@@ -172,8 +170,15 @@ public class MatchmakingManager {
             if (gameType.equals("KORAK_PO_KORAK")) {
                 seedMojBrojRoom(roomId, null, playerName, null, playerUid, null);
             }
-            listener.onMatchFound(roomId, 2);
+            removeFromQueueAndNotify(roomId, 2);
         }
+    }
+
+    private void removeFromQueueAndNotify(String roomId, int playerNumber) {
+        if (myQueueKey != null) {
+            db.child("queue").child(gameType).child(myQueueKey).removeValue();
+        }
+        listener.onMatchFound(roomId, playerNumber);
     }
 
     private void seedKorakRoundsFromPool(DatabaseReference roomRef) {
@@ -203,8 +208,7 @@ public class MatchmakingManager {
     private void writeKorakRoundFromSnapshot(DatabaseReference roomRef, int round, DataSnapshot src) {
         String solution = src.child("solution").getValue(String.class);
         if (solution != null) {
-            roomRef.child("rounds").child(String.valueOf(round)).child("solution")
-                    .setValue(solution);
+            roomRef.child("rounds").child(String.valueOf(round)).child("solution").setValue(solution);
         }
         for (int i = 0; i < 7; i++) {
             String step = src.child("steps").child(String.valueOf(i)).getValue(String.class);
@@ -233,15 +237,12 @@ public class MatchmakingManager {
         mbRef.child("roundEndsAt").setValue(0);
     }
 
-
     public void stopListening() {
         if (queueListener != null && myQueueKey != null) {
-            db.child("queue").child(gameType).child(myQueueKey)
-                    .removeEventListener(queueListener);
+            db.child("queue").child(gameType).child(myQueueKey).removeEventListener(queueListener);
         }
     }
 
-    @SuppressWarnings("unused")
     public void cancelSearch() {
         stopListening();
         if (myQueueKey != null) {
