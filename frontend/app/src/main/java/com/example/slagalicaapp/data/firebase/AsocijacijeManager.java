@@ -22,6 +22,7 @@ public class AsocijacijeManager {
                             Set<String> openedFields,
                             Map<String, Integer> columnsSolvedBy,
                             int finalSolvedBy,
+                            int finalGuessAttempts,
                             int p1Score, int p2Score);
 
         void onGameFinished(int p1Score, int p2Score, String forfeitBy);
@@ -101,11 +102,13 @@ public class AsocijacijeManager {
                 Long fsL = snapshot.child("finalSolvedBy").getValue(Long.class);
                 int finalSolvedBy = fsL != null ? fsL.intValue() : 0;
 
+                int finalGuessAttempts = toInt(snapshot.child("finalGuessAttempts").getValue(Long.class));
+
                 int p1Score = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
                 int p2Score = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
 
                 listener.onStateChanged(activePlayer, turnPhase, turnEndsAt,
-                        openedFields, columnsSolvedBy, finalSolvedBy, p1Score, p2Score);
+                        openedFields, columnsSolvedBy, finalSolvedBy, finalGuessAttempts, p1Score, p2Score);
             }
 
             @Override
