@@ -5,16 +5,12 @@ plugins {
 
 android {
     namespace 'com.example.slagalicaapp'
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.example.slagalicaapp"
         minSdk 24
-        targetSdk 36
+        targetSdk 35
         versionCode 1
         versionName "1.0"
 
@@ -53,6 +49,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-messaging'
     implementation 'com.google.zxing:core:3.5.3'
     implementation 'net.objecthunter:exp4j:0.4.8'
     implementation 'com.google.code.gson:gson:2.10.1'

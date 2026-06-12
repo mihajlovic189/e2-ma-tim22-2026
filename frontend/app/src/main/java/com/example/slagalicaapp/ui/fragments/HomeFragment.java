@@ -49,34 +49,36 @@ public class HomeFragment extends Fragment {
                         .commit());
 
 
-        binding.btnAsocijacija.setOnClickListener(v ->
-                getParentFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, new AsocijacijeFragment())
-                        .addToBackStack(null)
-                        .commit());
+        binding.btnAsocijacija.setOnClickListener(v -> {
+            binding.btnAsocijacija.setEnabled(false);
+            Toast.makeText(getContext(), "Pokrecemo Asocijacije matchmaking...", Toast.LENGTH_SHORT).show();
+            startMatchmaking(GameActivity.GAME_ASOCIJACIJE);
+        });
 
-        binding.btnSkocko.setOnClickListener(v ->
-                getParentFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, new SkockoFragment())
-                        .addToBackStack(null)
-                        .commit());
+        binding.btnSkocko.setOnClickListener(v -> {
+            binding.btnSkocko.setEnabled(false);
+            Toast.makeText(getContext(), "Pokrecemo Skocko matchmaking...", Toast.LENGTH_SHORT).show();
+            startMatchmaking(GameActivity.GAME_SKOCKO);
+        });
 
         View koZnaZnaButton = binding.getRoot().findViewById(R.id.btnKoZnaZna);
-        if (koZnaZnaButton != null) {
-            koZnaZnaButton.setOnClickListener(v ->
-                    getParentFragmentManager().beginTransaction()
-                            .replace(R.id.fragment_container, new KoZnaZnaFragment())
-                            .addToBackStack(null)
-                            .commit());
+        if (koZnaZnaButton instanceof Button) {
+            Button btnKoZnaZna = (Button) koZnaZnaButton;
+            btnKoZnaZna.setOnClickListener(v -> {
+                btnKoZnaZna.setEnabled(false);
+                Toast.makeText(getContext(), "Pokrecemo Ko Zna Zna matchmaking...", Toast.LENGTH_SHORT).show();
+                startMatchmaking(GameActivity.GAME_KO_ZNA_ZNA);
+            });
         }
 
         View spojniceButton = binding.getRoot().findViewById(R.id.btnSpojnice);
-        if (spojniceButton != null) {
-            spojniceButton.setOnClickListener(v ->
-                    getParentFragmentManager().beginTransaction()
-                            .replace(R.id.fragment_container, new SpojniceFragment())
-                            .addToBackStack(null)
-                            .commit());
+        if (spojniceButton instanceof Button) {
+            Button btnSpojnice = (Button) spojniceButton;
+            btnSpojnice.setOnClickListener(v -> {
+                btnSpojnice.setEnabled(false);
+                Toast.makeText(getContext(), "Pokrecemo Spojnice matchmaking...", Toast.LENGTH_SHORT).show();
+                startMatchmaking(GameActivity.GAME_SPOJNICE);
+            });
         }
 
         binding.btnNotifications.setOnClickListener(v ->
@@ -98,7 +100,7 @@ public class HomeFragment extends Fragment {
         String playerName = resolvePlayerName();
         if (TextUtils.isEmpty(playerName)) {
             Toast.makeText(getContext(), "Profil se još učitava, pokušaj ponovo", Toast.LENGTH_SHORT).show();
-            binding.btnIgrajOnline.setEnabled(true);
+            resetMatchmakingButton(gameType);
             return;
         }
 
@@ -115,7 +117,7 @@ public class HomeFragment extends Fragment {
                     intent.putExtra(GameActivity.EXTRA_PLAYER_NUM, playerNumber);
                     intent.putExtra(GameActivity.EXTRA_PLAYER_NAME, finalPlayerName);
                     startActivity(intent);
-                    binding.btnIgrajOnline.setEnabled(true);
+                    resetMatchmakingButton(gameType);
                 });
             }
 
@@ -128,14 +130,30 @@ public class HomeFragment extends Fragment {
 
             @Override
             public void onError(String message) {
-                requireActivity().runOnUiThread(() ->
-                        Toast.makeText(getContext(), "Greška: " + message, Toast.LENGTH_SHORT).show()
-                );
-                requireActivity().runOnUiThread(() -> binding.btnIgrajOnline.setEnabled(true));
+                requireActivity().runOnUiThread(() -> {
+                    Toast.makeText(getContext(), "Greška: " + message, Toast.LENGTH_SHORT).show();
+                    resetMatchmakingButton(gameType);
+                });
             }
         });
 
         matchmaking.findMatch();
+    }
+
+    private void resetMatchmakingButton(String gameType) {
+        if (GameActivity.GAME_SKOCKO.equals(gameType)) {
+            binding.btnSkocko.setEnabled(true);
+        } else if (GameActivity.GAME_KO_ZNA_ZNA.equals(gameType)) {
+            View btn = binding.getRoot().findViewById(R.id.btnKoZnaZna);
+            if (btn != null) btn.setEnabled(true);
+        } else if (GameActivity.GAME_SPOJNICE.equals(gameType)) {
+            View btn = binding.getRoot().findViewById(R.id.btnSpojnice);
+            if (btn != null) btn.setEnabled(true);
+        } else if (GameActivity.GAME_ASOCIJACIJE.equals(gameType)) {
+            binding.btnAsocijacija.setEnabled(true);
+        } else {
+            binding.btnIgrajOnline.setEnabled(true);
+        }
     }
 
     private String resolvePlayerName() {

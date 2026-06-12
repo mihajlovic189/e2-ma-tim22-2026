@@ -11,6 +11,10 @@ import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.ui.fragments.KorakPoKorakFragment;
 import com.example.slagalicaapp.ui.fragments.MojBrojFragment;
+import com.example.slagalicaapp.ui.fragments.AsocijacijeMultiplayerFragment;
+import com.example.slagalicaapp.ui.fragments.KoZnaZnaMultiplayerFragment;
+import com.example.slagalicaapp.ui.fragments.SkockoMultiplayerFragment;
+import com.example.slagalicaapp.ui.fragments.SpojniceMultiplayerFragment;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -28,8 +32,12 @@ public class GameActivity extends AppCompatActivity {
     public static final String EXTRA_PLAYER_NUM = "PLAYER_NUM";
     public static final String EXTRA_PLAYER_NAME = "PLAYER_NAME";
 
-    public static final String GAME_KORAK = "KORAK_PO_KORAK";
+    public static final String GAME_KORAK    = "KORAK_PO_KORAK";
     public static final String GAME_MOJ_BROJ = "MOJ_BROJ";
+    public static final String GAME_SKOCKO      = "SKOCKO";
+    public static final String GAME_KO_ZNA_ZNA = "KO_ZNA_ZNA";
+    public static final String GAME_SPOJNICE    = "SPOJNICE";
+    public static final String GAME_ASOCIJACIJE = "ASOCIJACIJE";
 
     private String roomId;
     private int playerNumber;
@@ -74,7 +82,7 @@ public class GameActivity extends AppCompatActivity {
 
     private void resolvePlayerNumberFromRoom(Runnable onReady) {
         DatabaseReference roomRef = FirebaseDatabase.getInstance().getReference()
-                .child("rooms").child(GAME_KORAK).child(roomId);
+                .child("rooms").child(currentGameType).child(roomId);
         roomRef.addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
             @Override
             public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
@@ -132,6 +140,14 @@ public class GameActivity extends AppCompatActivity {
 
         if (GAME_MOJ_BROJ.equals(gameType)) {
             fragment = new MojBrojFragment();
+        } else if (GAME_SKOCKO.equals(gameType)) {
+            fragment = new SkockoMultiplayerFragment();
+        } else if (GAME_KO_ZNA_ZNA.equals(gameType)) {
+            fragment = new KoZnaZnaMultiplayerFragment();
+        } else if (GAME_SPOJNICE.equals(gameType)) {
+            fragment = new SpojniceMultiplayerFragment();
+        } else if (GAME_ASOCIJACIJE.equals(gameType)) {
+            fragment = new AsocijacijeMultiplayerFragment();
         } else {
             fragment = new KorakPoKorakFragment();
         }
@@ -152,8 +168,18 @@ public class GameActivity extends AppCompatActivity {
         String winnerKey = playerNumber == 1 ? "player2" : "player1";
         long finishedAt = System.currentTimeMillis();
 
-        updateForfeitRoom(GAME_KORAK, playerKey, winnerKey, finishedAt);
-        updateForfeitRoom(GAME_MOJ_BROJ, playerKey, winnerKey, finishedAt);
+        if (GAME_SKOCKO.equals(currentGameType)) {
+            updateForfeitRoom(GAME_SKOCKO, playerKey, winnerKey, finishedAt);
+        } else if (GAME_KO_ZNA_ZNA.equals(currentGameType)) {
+            updateForfeitRoom(GAME_KO_ZNA_ZNA, playerKey, winnerKey, finishedAt);
+        } else if (GAME_SPOJNICE.equals(currentGameType)) {
+            updateForfeitRoom(GAME_SPOJNICE, playerKey, winnerKey, finishedAt);
+        } else if (GAME_ASOCIJACIJE.equals(currentGameType)) {
+            updateForfeitRoom(GAME_ASOCIJACIJE, playerKey, winnerKey, finishedAt);
+        } else {
+            updateForfeitRoom(GAME_KORAK, playerKey, winnerKey, finishedAt);
+            updateForfeitRoom(GAME_MOJ_BROJ, playerKey, winnerKey, finishedAt);
+        }
         persistFinalResultAndFinish(true);
     }
 
@@ -191,15 +217,32 @@ public class GameActivity extends AppCompatActivity {
         DatabaseReference roomRef = FirebaseDatabase.getInstance().getReference()
                 .child("rooms").child(resultGameType).child(roomId);
 
+        boolean needsRtdbCleanup = GAME_SKOCKO.equals(resultGameType)
+                || GAME_KO_ZNA_ZNA.equals(resultGameType)
+                || GAME_SPOJNICE.equals(resultGameType)
+                || GAME_ASOCIJACIJE.equals(resultGameType);
+        String firestoreCollection;
+        if (GAME_SKOCKO.equals(resultGameType))          firestoreCollection = "skocko_results";
+        else if (GAME_SPOJNICE.equals(resultGameType))   firestoreCollection = "spojnice_results";
+        else if (GAME_ASOCIJACIJE.equals(resultGameType)) firestoreCollection = "asocijacije_results";
+        else                                              firestoreCollection = "ko_zna_zna_results";
+
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 GameResult result = buildGameResult(snapshot, resultGameType, finishedAt, forfeit);
-                Log.d(TAG, "Saving game result to Firestore collection ko_zna_zna_results: " + result.gameType);
-                gameResultRepository.saveGameResult(result)
+                Log.d(TAG, "Saving game result to Firestore collection " + firestoreCollection + ": " + result.gameType);
+                gameResultRepository.saveGameResult(result, firestoreCollection)
                         .addOnSuccessListener(documentReference -> {
                             Toast.makeText(GameActivity.this, "Rezultat sačuvan.", Toast.LENGTH_SHORT).show();
-                            finish();
+                            if (needsRtdbCleanup) {
+                                FirebaseDatabase.getInstance().getReference()
+                                        .child("rooms").child(resultGameType).child(roomId)
+                                        .removeValue()
+                                        .addOnCompleteListener(t -> finish());
+                            } else {
+                                finish();
+                            }
                         })
                         .addOnFailureListener(e -> {
                             Log.e(TAG, "Failed to save game result to Firestore", e);
