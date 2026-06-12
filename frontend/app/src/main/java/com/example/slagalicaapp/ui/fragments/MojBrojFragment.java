@@ -159,7 +159,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
                             stopCount = 2;
                             startGameTimer();
 
-                            new Handler().postDelayed(() -> {
+                            autoStopHandler.postDelayed(() -> {
                                 if (binding != null) binding.btnSubmit.setEnabled(true);
                             }, 5000);
                         });
@@ -183,7 +183,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
                             updateScoreUI();
                             Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
 
-                            new Handler().postDelayed(() -> {
+                            autoStopHandler.postDelayed(() -> {
                                 if (firebaseManager != null) {
                                     firebaseManager.startNextRoundIfReady(2);
                                 }
@@ -217,7 +217,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
                             Toast.makeText(getContext(),
                                     "Kraj igre! " + winner + " (" + p1Score + ":" + p2Score + ")",
                                     Toast.LENGTH_LONG).show();
-                            new Handler().postDelayed(MojBrojFragment.this::notifyGameFinished, 5000);
+                            autoStopHandler.postDelayed(() -> { if (isAdded()) notifyGameFinished(); }, 5000);
                         });
                     }
 
@@ -355,6 +355,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     }
 
     private void notifyGameFinished() {
+        if (!isAdded()) return;
         Bundle result = new Bundle();
         result.putString("game", "MOJ_BROJ");
         getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);

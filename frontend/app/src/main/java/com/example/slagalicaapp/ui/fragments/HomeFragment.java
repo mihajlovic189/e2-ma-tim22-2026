@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.Toast;
 import android.text.TextUtils;
 
@@ -48,6 +47,17 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
+        binding.btnKorakPoKorak.setOnClickListener(v -> {
+            binding.btnKorakPoKorak.setEnabled(false);
+            Toast.makeText(getContext(), "Pokrecemo Korak po korak matchmaking...", Toast.LENGTH_SHORT).show();
+            startMatchmaking(GameActivity.GAME_KORAK);
+        });
+
+        binding.btnMojBroj.setOnClickListener(v -> {
+            binding.btnMojBroj.setEnabled(false);
+            Toast.makeText(getContext(), "Pokrecemo Moj broj matchmaking...", Toast.LENGTH_SHORT).show();
+            startMatchmaking(GameActivity.GAME_MOJ_BROJ);
+        });
 
         binding.btnAsocijacija.setOnClickListener(v -> {
             binding.btnAsocijacija.setEnabled(false);
@@ -62,20 +72,18 @@ public class HomeFragment extends Fragment {
         });
 
         View koZnaZnaButton = binding.getRoot().findViewById(R.id.btnKoZnaZna);
-        if (koZnaZnaButton instanceof Button) {
-            Button btnKoZnaZna = (Button) koZnaZnaButton;
-            btnKoZnaZna.setOnClickListener(v -> {
-                btnKoZnaZna.setEnabled(false);
+        if (koZnaZnaButton != null) {
+            koZnaZnaButton.setOnClickListener(v -> {
+                koZnaZnaButton.setEnabled(false);
                 Toast.makeText(getContext(), "Pokrecemo Ko Zna Zna matchmaking...", Toast.LENGTH_SHORT).show();
                 startMatchmaking(GameActivity.GAME_KO_ZNA_ZNA);
             });
         }
 
         View spojniceButton = binding.getRoot().findViewById(R.id.btnSpojnice);
-        if (spojniceButton instanceof Button) {
-            Button btnSpojnice = (Button) spojniceButton;
-            btnSpojnice.setOnClickListener(v -> {
-                btnSpojnice.setEnabled(false);
+        if (spojniceButton != null) {
+            spojniceButton.setOnClickListener(v -> {
+                spojniceButton.setEnabled(false);
                 Toast.makeText(getContext(), "Pokrecemo Spojnice matchmaking...", Toast.LENGTH_SHORT).show();
                 startMatchmaking(GameActivity.GAME_SPOJNICE);
             });
@@ -86,12 +94,6 @@ public class HomeFragment extends Fragment {
                         .replace(R.id.fragment_container, new NotificationsFragment())
                         .addToBackStack(null)
                         .commit());
-
-        binding.btnIgrajOnline.setOnClickListener(v -> {
-            binding.btnIgrajOnline.setEnabled(false);
-            Toast.makeText(getContext(), "Pokrećem matchmaking...", Toast.LENGTH_SHORT).show();
-            startMatchmaking(GameActivity.GAME_KORAK);
-        });
 
         return binding.getRoot();
     }
@@ -141,7 +143,11 @@ public class HomeFragment extends Fragment {
     }
 
     private void resetMatchmakingButton(String gameType) {
-        if (GameActivity.GAME_SKOCKO.equals(gameType)) {
+        if (GameActivity.GAME_KORAK.equals(gameType)) {
+            binding.btnKorakPoKorak.setEnabled(true);
+        } else if (GameActivity.GAME_MOJ_BROJ.equals(gameType)) {
+            binding.btnMojBroj.setEnabled(true);
+        } else if (GameActivity.GAME_SKOCKO.equals(gameType)) {
             binding.btnSkocko.setEnabled(true);
         } else if (GameActivity.GAME_KO_ZNA_ZNA.equals(gameType)) {
             View btn = binding.getRoot().findViewById(R.id.btnKoZnaZna);
@@ -151,8 +157,6 @@ public class HomeFragment extends Fragment {
             if (btn != null) btn.setEnabled(true);
         } else if (GameActivity.GAME_ASOCIJACIJE.equals(gameType)) {
             binding.btnAsocijacija.setEnabled(true);
-        } else {
-            binding.btnIgrajOnline.setEnabled(true);
         }
     }
 

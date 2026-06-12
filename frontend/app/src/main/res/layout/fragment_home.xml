@@ -24,23 +24,13 @@
             android:textColor="@color/text" />
 
         <Button
-            android:id="@+id/btnIgrajOnline"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Igraj online"
-            android:textColor="@color/text"
-            android:backgroundTint="@color/primary" />
-
-        <Button
             android:id="@+id/btnKorakPoKorak"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:text="Igra: Korak po korak"
             android:textColor="@color/text"
-            android:backgroundTint="@color/primary"
-            android:visibility="gone" />
+            android:backgroundTint="@color/primary" />
 
         <Button
             android:id="@+id/btnMojBroj"
@@ -49,8 +39,7 @@
             android:layout_marginTop="10dp"
             android:text="Igra: Moj broj"
             android:textColor="@color/text"
-            android:backgroundTint="@color/primary"
-            android:visibility="gone" />
+            android:backgroundTint="@color/primary" />
 
         <Button
             android:id="@+id/btnAsocijacija"

@@ -1,7 +1,6 @@
 package com.example.slagalicaapp.ui.activities;
 
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -63,15 +62,8 @@ public class GameActivity extends AppCompatActivity {
         if (currentGameType == null) currentGameType = GAME_KORAK;
 
         getSupportFragmentManager().setFragmentResultListener(
-                "GAME_FINISHED", this, (requestKey, result) -> {
-                    if (GAME_KORAK.equals(currentGameType)) {
-                        currentGameType = GAME_MOJ_BROJ;
-                        new Handler().postDelayed(() ->
-                                syncMojBrojRoomFromKorak(() -> showGameFragment(currentGameType)), 5000);
-                    } else {
-                        persistFinalResultAndFinish(false);
-                    }
-                });
+                "GAME_FINISHED", this, (requestKey, result) ->
+                        persistFinalResultAndFinish(false));
 
         if (roomId != null && playerName != null) {
             resolvePlayerNumberFromRoom(() -> showGameFragment(currentGameType));
@@ -176,8 +168,9 @@ public class GameActivity extends AppCompatActivity {
             updateForfeitRoom(GAME_SPOJNICE, playerKey, winnerKey, finishedAt);
         } else if (GAME_ASOCIJACIJE.equals(currentGameType)) {
             updateForfeitRoom(GAME_ASOCIJACIJE, playerKey, winnerKey, finishedAt);
-        } else {
+        } else if (GAME_KORAK.equals(currentGameType)) {
             updateForfeitRoom(GAME_KORAK, playerKey, winnerKey, finishedAt);
+        } else if (GAME_MOJ_BROJ.equals(currentGameType)) {
             updateForfeitRoom(GAME_MOJ_BROJ, playerKey, winnerKey, finishedAt);
         }
         persistFinalResultAndFinish(true);
@@ -220,16 +213,24 @@ public class GameActivity extends AppCompatActivity {
         boolean needsRtdbCleanup = GAME_SKOCKO.equals(resultGameType)
                 || GAME_KO_ZNA_ZNA.equals(resultGameType)
                 || GAME_SPOJNICE.equals(resultGameType)
-                || GAME_ASOCIJACIJE.equals(resultGameType);
+                || GAME_ASOCIJACIJE.equals(resultGameType)
+                || GAME_KORAK.equals(resultGameType)
+                || GAME_MOJ_BROJ.equals(resultGameType);
         String firestoreCollection;
-        if (GAME_SKOCKO.equals(resultGameType))          firestoreCollection = "skocko_results";
-        else if (GAME_SPOJNICE.equals(resultGameType))   firestoreCollection = "spojnice_results";
+        if (GAME_SKOCKO.equals(resultGameType))           firestoreCollection = "skocko_results";
+        else if (GAME_SPOJNICE.equals(resultGameType))    firestoreCollection = "spojnice_results";
         else if (GAME_ASOCIJACIJE.equals(resultGameType)) firestoreCollection = "asocijacije_results";
+        else if (GAME_KORAK.equals(resultGameType))       firestoreCollection = "korak_po_korak_results";
+        else if (GAME_MOJ_BROJ.equals(resultGameType))    firestoreCollection = "moj_broj_results";
         else                                              firestoreCollection = "ko_zna_zna_results";
 
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!snapshot.exists()) {
+                    finish();
+                    return;
+                }
                 GameResult result = buildGameResult(snapshot, resultGameType, finishedAt, forfeit);
                 Log.d(TAG, "Saving game result to Firestore collection " + firestoreCollection + ": " + result.gameType);
                 gameResultRepository.saveGameResult(result, firestoreCollection)
@@ -331,47 +332,4 @@ public class GameActivity extends AppCompatActivity {
         return fallback;
     }
 
-    private void syncMojBrojRoomFromKorak(Runnable onDone) {
-        if (roomId == null) {
-            onDone.run();
-            return;
-        }
-
-        DatabaseReference korakRef = FirebaseDatabase.getInstance().getReference()
-                .child("rooms").child(GAME_KORAK).child(roomId);
-        korakRef.addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
-                String p1 = snapshot.child("player1").getValue(String.class);
-                String p2 = snapshot.child("player2").getValue(String.class);
-                String p1Uid = snapshot.child("player1Uid").getValue(String.class);
-                String p2Uid = snapshot.child("player2Uid").getValue(String.class);
-                Long s1 = snapshot.child("scores").child("player1").getValue(Long.class);
-                Long s2 = snapshot.child("scores").child("player2").getValue(Long.class);
-
-                DatabaseReference mbRef = FirebaseDatabase.getInstance().getReference()
-                        .child("rooms").child(GAME_MOJ_BROJ).child(roomId);
-
-                java.util.Map<String, Object> update = new java.util.HashMap<>();
-                if (p1 != null) update.put("player1", p1);
-                if (p2 != null) update.put("player2", p2);
-                if (p1Uid != null) update.put("player1Uid", p1Uid);
-                if (p2Uid != null) update.put("player2Uid", p2Uid);
-                if (s1 != null) update.put("scores/player1", s1);
-                if (s2 != null) update.put("scores/player2", s2);
-
-                if (update.isEmpty()) {
-                    onDone.run();
-                    return;
-                }
-
-                mbRef.updateChildren(update).addOnCompleteListener(task -> onDone.run());
-            }
-
-            @Override
-            public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {
-                onDone.run();
-            }
-        });
-    }
 }

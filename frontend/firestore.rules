@@ -1,36 +1,44 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Existing user profile data used by the app.
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Match results for Ko zna zna.
     match /ko_zna_zna_results/{resultId} {
       allow create: if request.auth != null;
       allow read: if request.auth != null;
       allow update, delete: if false;
     }
 
-    // Match results for Spojnice.
     match /spojnice_results/{resultId} {
       allow create: if request.auth != null;
       allow read: if request.auth != null;
       allow update, delete: if false;
     }
-    
-    	match /asocijacije_results/{resultId} {
-	  allow create: if request.auth != null;
-	  allow read: if request.auth != null;
-	  allow update, delete: if false;
-	}
-	
-	match /skocko_results/{resultId} {
-	  allow create: if request.auth != null;
-	  allow read: if request.auth != null;
-	  allow update, delete: if false;
-	}
+
+    match /asocijacije_results/{resultId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    match /skocko_results/{resultId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    match /korak_po_korak_results/{resultId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    match /moj_broj_results/{resultId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update, delete: if false;
+    }
   }
 }
-
