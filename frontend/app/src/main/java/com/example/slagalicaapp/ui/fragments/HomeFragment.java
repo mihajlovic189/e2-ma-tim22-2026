@@ -55,11 +55,11 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
-        binding.btnSkocko.setOnClickListener(v ->
-                getParentFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, new SkockoFragment())
-                        .addToBackStack(null)
-                        .commit());
+        binding.btnSkocko.setOnClickListener(v -> {
+            binding.btnSkocko.setEnabled(false);
+            Toast.makeText(getContext(), "Pokrecemo Skocko matchmaking...", Toast.LENGTH_SHORT).show();
+            startMatchmaking(GameActivity.GAME_SKOCKO);
+        });
 
         View koZnaZnaButton = binding.getRoot().findViewById(R.id.btnKoZnaZna);
         if (koZnaZnaButton != null) {
@@ -98,7 +98,7 @@ public class HomeFragment extends Fragment {
         String playerName = resolvePlayerName();
         if (TextUtils.isEmpty(playerName)) {
             Toast.makeText(getContext(), "Profil se još učitava, pokušaj ponovo", Toast.LENGTH_SHORT).show();
-            binding.btnIgrajOnline.setEnabled(true);
+            resetMatchmakingButton(gameType);
             return;
         }
 
@@ -115,7 +115,7 @@ public class HomeFragment extends Fragment {
                     intent.putExtra(GameActivity.EXTRA_PLAYER_NUM, playerNumber);
                     intent.putExtra(GameActivity.EXTRA_PLAYER_NAME, finalPlayerName);
                     startActivity(intent);
-                    binding.btnIgrajOnline.setEnabled(true);
+                    resetMatchmakingButton(gameType);
                 });
             }
 
@@ -128,14 +128,22 @@ public class HomeFragment extends Fragment {
 
             @Override
             public void onError(String message) {
-                requireActivity().runOnUiThread(() ->
-                        Toast.makeText(getContext(), "Greška: " + message, Toast.LENGTH_SHORT).show()
-                );
-                requireActivity().runOnUiThread(() -> binding.btnIgrajOnline.setEnabled(true));
+                requireActivity().runOnUiThread(() -> {
+                    Toast.makeText(getContext(), "Greška: " + message, Toast.LENGTH_SHORT).show();
+                    resetMatchmakingButton(gameType);
+                });
             }
         });
 
         matchmaking.findMatch();
+    }
+
+    private void resetMatchmakingButton(String gameType) {
+        if (GameActivity.GAME_SKOCKO.equals(gameType)) {
+            binding.btnSkocko.setEnabled(true);
+        } else {
+            binding.btnIgrajOnline.setEnabled(true);
+        }
     }
 
     private String resolvePlayerName() {

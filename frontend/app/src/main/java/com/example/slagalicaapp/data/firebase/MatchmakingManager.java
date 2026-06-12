@@ -23,6 +23,7 @@ public class MatchmakingManager {
     private final String playerUid;
     private ValueEventListener queueListener;
     private String myQueueKey;
+    private final Random random = new Random();
 
     public MatchmakingManager(String gameType, String playerName, String playerUid, MatchmakingListener listener) {
         this.db = FirebaseDatabase.getInstance().getReference();
@@ -43,16 +44,23 @@ public class MatchmakingManager {
                         public void onDataChange(@NonNull DataSnapshot snapshot) {
                             if (snapshot.exists()) {
                                 DataSnapshot existing = snapshot.getChildren().iterator().next();
-                                String roomId = existing.child("roomId").getValue(String.class);
-                                String status = existing.child("status").getValue(String.class);
-                                String key = existing.getKey();
-                                myQueueKey = key;
-                                if ("matched".equals(status) && roomId != null) {
-                                    listener.onMatchFound(roomId, 1);
+                                String existingRoomId = existing.child("roomId").getValue(String.class);
+                                String existingStatus = existing.child("status").getValue(String.class);
+                                String existingKey = existing.getKey();
+
+                                // Stale "matched" entry from a previous game — delete and search fresh
+                                if ("matched".equals(existingStatus)) {
+                                    if (existingKey != null) {
+                                        queueRef.child(existingKey).removeValue();
+                                    }
+                                    searchForMatch(queueRef);
                                     return;
                                 }
-                                if (key != null) {
-                                    attachQueueListener(queueRef.child(key), roomId);
+
+                                // Still "waiting" — reuse the existing slot
+                                myQueueKey = existingKey;
+                                if (existingKey != null) {
+                                    attachQueueListener(queueRef.child(existingKey), existingRoomId);
                                 }
                                 listener.onWaiting();
                                 return;
@@ -127,6 +135,11 @@ public class MatchmakingManager {
                 String status = snapshot.child("status").getValue(String.class);
                 if ("matched".equals(status)) {
                     stopListening();
+                    // Delete queue entry so future matchmaking doesn't pick up this stale slot
+                    if (myQueueKey != null) {
+                        db.child("queue").child(gameType).child(myQueueKey).removeValue();
+                        myQueueKey = null;
+                    }
                     if (roomId != null) {
                         listener.onMatchFound(roomId, 1);
                     }
@@ -164,6 +177,11 @@ public class MatchmakingManager {
                 roomRef.child("roundStatus").setValue("playing");
                 roomRef.child("targetRevealed").setValue(false);
                 roomRef.child("numbersRevealed").setValue(false);
+            } else if (gameType.equals("SKOCKO")) {
+                roomRef.child("secret1").setValue(generateSkockoSecret());
+                roomRef.child("secret2").setValue(generateSkockoSecret());
+                roomRef.child("phase").setValue("ROUND_1_PLAYING");
+                roomRef.child("phaseEndsAt").setValue(startedAt + MAIN_SKOCKO_DURATION_MS);
             }
         } else {
             roomRef.child("player2").setValue(playerName);
@@ -171,9 +189,20 @@ public class MatchmakingManager {
             roomRef.child("status").setValue("playing");
             if (gameType.equals("KORAK_PO_KORAK")) {
                 seedMojBrojRoom(roomId, null, playerName, null, playerUid, null);
+            } else if (gameType.equals("SKOCKO")) {
+                // Reset phaseEndsAt to now so both players get a fresh countdown
+                roomRef.child("phaseEndsAt")
+                        .setValue(System.currentTimeMillis() + MAIN_SKOCKO_DURATION_MS);
             }
             listener.onMatchFound(roomId, 2);
         }
+    }
+
+    private static final long MAIN_SKOCKO_DURATION_MS = 30_000L;
+
+    private String generateSkockoSecret() {
+        return random.nextInt(6) + "," + random.nextInt(6) + ","
+                + random.nextInt(6) + "," + random.nextInt(6);
     }
 
     private void seedKorakRoundsFromPool(DatabaseReference roomRef) {

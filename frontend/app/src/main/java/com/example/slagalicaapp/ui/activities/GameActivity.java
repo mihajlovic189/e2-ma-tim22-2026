@@ -11,6 +11,7 @@ import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.ui.fragments.KorakPoKorakFragment;
 import com.example.slagalicaapp.ui.fragments.MojBrojFragment;
+import com.example.slagalicaapp.ui.fragments.SkockoMultiplayerFragment;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -28,8 +29,9 @@ public class GameActivity extends AppCompatActivity {
     public static final String EXTRA_PLAYER_NUM = "PLAYER_NUM";
     public static final String EXTRA_PLAYER_NAME = "PLAYER_NAME";
 
-    public static final String GAME_KORAK = "KORAK_PO_KORAK";
+    public static final String GAME_KORAK    = "KORAK_PO_KORAK";
     public static final String GAME_MOJ_BROJ = "MOJ_BROJ";
+    public static final String GAME_SKOCKO   = "SKOCKO";
 
     private String roomId;
     private int playerNumber;
@@ -74,7 +76,7 @@ public class GameActivity extends AppCompatActivity {
 
     private void resolvePlayerNumberFromRoom(Runnable onReady) {
         DatabaseReference roomRef = FirebaseDatabase.getInstance().getReference()
-                .child("rooms").child(GAME_KORAK).child(roomId);
+                .child("rooms").child(currentGameType).child(roomId);
         roomRef.addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
             @Override
             public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
@@ -132,6 +134,8 @@ public class GameActivity extends AppCompatActivity {
 
         if (GAME_MOJ_BROJ.equals(gameType)) {
             fragment = new MojBrojFragment();
+        } else if (GAME_SKOCKO.equals(gameType)) {
+            fragment = new SkockoMultiplayerFragment();
         } else {
             fragment = new KorakPoKorakFragment();
         }
@@ -152,8 +156,12 @@ public class GameActivity extends AppCompatActivity {
         String winnerKey = playerNumber == 1 ? "player2" : "player1";
         long finishedAt = System.currentTimeMillis();
 
-        updateForfeitRoom(GAME_KORAK, playerKey, winnerKey, finishedAt);
-        updateForfeitRoom(GAME_MOJ_BROJ, playerKey, winnerKey, finishedAt);
+        if (GAME_SKOCKO.equals(currentGameType)) {
+            updateForfeitRoom(GAME_SKOCKO, playerKey, winnerKey, finishedAt);
+        } else {
+            updateForfeitRoom(GAME_KORAK, playerKey, winnerKey, finishedAt);
+            updateForfeitRoom(GAME_MOJ_BROJ, playerKey, winnerKey, finishedAt);
+        }
         persistFinalResultAndFinish(true);
     }
 
@@ -191,15 +199,26 @@ public class GameActivity extends AppCompatActivity {
         DatabaseReference roomRef = FirebaseDatabase.getInstance().getReference()
                 .child("rooms").child(resultGameType).child(roomId);
 
+        boolean isSkocko = GAME_SKOCKO.equals(resultGameType);
+        String firestoreCollection = isSkocko ? "skocko_results" : "ko_zna_zna_results";
+
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 GameResult result = buildGameResult(snapshot, resultGameType, finishedAt, forfeit);
-                Log.d(TAG, "Saving game result to Firestore collection ko_zna_zna_results: " + result.gameType);
-                gameResultRepository.saveGameResult(result)
+                Log.d(TAG, "Saving game result to Firestore collection " + firestoreCollection + ": " + result.gameType);
+                gameResultRepository.saveGameResult(result, firestoreCollection)
                         .addOnSuccessListener(documentReference -> {
                             Toast.makeText(GameActivity.this, "Rezultat sačuvan.", Toast.LENGTH_SHORT).show();
-                            finish();
+                            if (isSkocko) {
+                                // Clean up RTDB room after Firestore write succeeds
+                                FirebaseDatabase.getInstance().getReference()
+                                        .child("rooms").child(GAME_SKOCKO).child(roomId)
+                                        .removeValue()
+                                        .addOnCompleteListener(t -> finish());
+                            } else {
+                                finish();
+                            }
                         })
                         .addOnFailureListener(e -> {
                             Log.e(TAG, "Failed to save game result to Firestore", e);
