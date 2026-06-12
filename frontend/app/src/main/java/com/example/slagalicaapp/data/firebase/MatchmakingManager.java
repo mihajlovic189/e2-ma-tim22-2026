@@ -182,6 +182,8 @@ public class MatchmakingManager {
                 roomRef.child("secret2").setValue(generateSkockoSecret());
                 roomRef.child("phase").setValue("ROUND_1_PLAYING");
                 roomRef.child("phaseEndsAt").setValue(startedAt + MAIN_SKOCKO_DURATION_MS);
+            } else if (gameType.equals("KO_ZNA_ZNA")) {
+                seedKoZnaZnaQuestions(roomRef);
             }
         } else {
             roomRef.child("player2").setValue(playerName);
@@ -193,12 +195,52 @@ public class MatchmakingManager {
                 // Reset phaseEndsAt to now so both players get a fresh countdown
                 roomRef.child("phaseEndsAt")
                         .setValue(System.currentTimeMillis() + MAIN_SKOCKO_DURATION_MS);
+            } else if (gameType.equals("KO_ZNA_ZNA")) {
+                long now = System.currentTimeMillis();
+                roomRef.child("currentQuestionIndex").setValue(0);
+                roomRef.child("questionStatus").setValue("playing");
+                roomRef.child("questionStartedAt").setValue(now + 2000L);
             }
             listener.onMatchFound(roomId, 2);
         }
     }
 
     private static final long MAIN_SKOCKO_DURATION_MS = 30_000L;
+
+    private void seedKoZnaZnaQuestions(DatabaseReference roomRef) {
+        db.child("KoZnaZna").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                List<DataSnapshot> all = new ArrayList<>();
+                for (DataSnapshot q : snapshot.getChildren()) all.add(q);
+                if (all.isEmpty()) return;
+                Collections.shuffle(all, random);
+                int count = Math.min(5, all.size());
+
+                java.util.Map<String, Object> questionsMap = new java.util.HashMap<>();
+                for (int i = 0; i < count; i++) {
+                    DataSnapshot src = all.get(i);
+                    String key = String.valueOf(i);
+                    questionsMap.put("questions/" + key + "/questionText",
+                            src.child("questionText").getValue(String.class));
+                    Long correctL = src.child("correctAnswerIndex").getValue(Long.class);
+                    questionsMap.put("questions/" + key + "/correctAnswerIndex",
+                            correctL != null ? correctL.intValue() : 0);
+                    int optIdx = 0;
+                    for (DataSnapshot opt : src.child("options").getChildren()) {
+                        questionsMap.put("questions/" + key + "/options/" + optIdx,
+                                opt.getValue(String.class));
+                        optIdx++;
+                    }
+                }
+                questionsMap.put("questionCount", count);
+                roomRef.updateChildren(questionsMap);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
 
     private String generateSkockoSecret() {
         return random.nextInt(6) + "," + random.nextInt(6) + ","

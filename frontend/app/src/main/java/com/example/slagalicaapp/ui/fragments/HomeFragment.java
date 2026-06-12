@@ -62,12 +62,13 @@ public class HomeFragment extends Fragment {
         });
 
         View koZnaZnaButton = binding.getRoot().findViewById(R.id.btnKoZnaZna);
-        if (koZnaZnaButton != null) {
-            koZnaZnaButton.setOnClickListener(v ->
-                    getParentFragmentManager().beginTransaction()
-                            .replace(R.id.fragment_container, new KoZnaZnaFragment())
-                            .addToBackStack(null)
-                            .commit());
+        if (koZnaZnaButton instanceof Button) {
+            Button btnKoZnaZna = (Button) koZnaZnaButton;
+            btnKoZnaZna.setOnClickListener(v -> {
+                btnKoZnaZna.setEnabled(false);
+                Toast.makeText(getContext(), "Pokrecemo Ko Zna Zna matchmaking...", Toast.LENGTH_SHORT).show();
+                startMatchmaking(GameActivity.GAME_KO_ZNA_ZNA);
+            });
         }
 
         View spojniceButton = binding.getRoot().findViewById(R.id.btnSpojnice);
@@ -141,6 +142,9 @@ public class HomeFragment extends Fragment {
     private void resetMatchmakingButton(String gameType) {
         if (GameActivity.GAME_SKOCKO.equals(gameType)) {
             binding.btnSkocko.setEnabled(true);
+        } else if (GameActivity.GAME_KO_ZNA_ZNA.equals(gameType)) {
+            View btn = binding.getRoot().findViewById(R.id.btnKoZnaZna);
+            if (btn != null) btn.setEnabled(true);
         } else {
             binding.btnIgrajOnline.setEnabled(true);
         }
