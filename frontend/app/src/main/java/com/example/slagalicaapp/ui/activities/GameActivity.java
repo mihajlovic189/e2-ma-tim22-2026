@@ -13,6 +13,7 @@ import com.example.slagalicaapp.ui.fragments.KorakPoKorakFragment;
 import com.example.slagalicaapp.ui.fragments.MojBrojFragment;
 import com.example.slagalicaapp.ui.fragments.KoZnaZnaMultiplayerFragment;
 import com.example.slagalicaapp.ui.fragments.SkockoMultiplayerFragment;
+import com.example.slagalicaapp.ui.fragments.SpojniceMultiplayerFragment;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -34,6 +35,7 @@ public class GameActivity extends AppCompatActivity {
     public static final String GAME_MOJ_BROJ = "MOJ_BROJ";
     public static final String GAME_SKOCKO      = "SKOCKO";
     public static final String GAME_KO_ZNA_ZNA = "KO_ZNA_ZNA";
+    public static final String GAME_SPOJNICE   = "SPOJNICE";
 
     private String roomId;
     private int playerNumber;
@@ -140,6 +142,8 @@ public class GameActivity extends AppCompatActivity {
             fragment = new SkockoMultiplayerFragment();
         } else if (GAME_KO_ZNA_ZNA.equals(gameType)) {
             fragment = new KoZnaZnaMultiplayerFragment();
+        } else if (GAME_SPOJNICE.equals(gameType)) {
+            fragment = new SpojniceMultiplayerFragment();
         } else {
             fragment = new KorakPoKorakFragment();
         }
@@ -164,6 +168,8 @@ public class GameActivity extends AppCompatActivity {
             updateForfeitRoom(GAME_SKOCKO, playerKey, winnerKey, finishedAt);
         } else if (GAME_KO_ZNA_ZNA.equals(currentGameType)) {
             updateForfeitRoom(GAME_KO_ZNA_ZNA, playerKey, winnerKey, finishedAt);
+        } else if (GAME_SPOJNICE.equals(currentGameType)) {
+            updateForfeitRoom(GAME_SPOJNICE, playerKey, winnerKey, finishedAt);
         } else {
             updateForfeitRoom(GAME_KORAK, playerKey, winnerKey, finishedAt);
             updateForfeitRoom(GAME_MOJ_BROJ, playerKey, winnerKey, finishedAt);
@@ -205,8 +211,13 @@ public class GameActivity extends AppCompatActivity {
         DatabaseReference roomRef = FirebaseDatabase.getInstance().getReference()
                 .child("rooms").child(resultGameType).child(roomId);
 
-        boolean needsRtdbCleanup = GAME_SKOCKO.equals(resultGameType) || GAME_KO_ZNA_ZNA.equals(resultGameType);
-        String firestoreCollection = GAME_SKOCKO.equals(resultGameType) ? "skocko_results" : "ko_zna_zna_results";
+        boolean needsRtdbCleanup = GAME_SKOCKO.equals(resultGameType)
+                || GAME_KO_ZNA_ZNA.equals(resultGameType)
+                || GAME_SPOJNICE.equals(resultGameType);
+        String firestoreCollection;
+        if (GAME_SKOCKO.equals(resultGameType))      firestoreCollection = "skocko_results";
+        else if (GAME_SPOJNICE.equals(resultGameType)) firestoreCollection = "spojnice_results";
+        else                                           firestoreCollection = "ko_zna_zna_results";
 
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override

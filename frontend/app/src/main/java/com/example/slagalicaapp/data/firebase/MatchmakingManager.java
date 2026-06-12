@@ -184,6 +184,10 @@ public class MatchmakingManager {
                 roomRef.child("phaseEndsAt").setValue(startedAt + MAIN_SKOCKO_DURATION_MS);
             } else if (gameType.equals("KO_ZNA_ZNA")) {
                 seedKoZnaZnaQuestions(roomRef);
+            } else if (gameType.equals("SPOJNICE")) {
+                roomRef.child("currentRound").setValue(0);
+                roomRef.child("currentPlayer").setValue(1);
+                seedSpojniceGames(roomRef);
             }
         } else {
             roomRef.child("player2").setValue(playerName);
@@ -200,12 +204,57 @@ public class MatchmakingManager {
                 roomRef.child("currentQuestionIndex").setValue(0);
                 roomRef.child("questionStatus").setValue("playing");
                 roomRef.child("questionStartedAt").setValue(now + 2000L);
+            } else if (gameType.equals("SPOJNICE")) {
+                roomRef.child("turnEndsAt").setValue(System.currentTimeMillis() + 32_000L);
             }
             listener.onMatchFound(roomId, 2);
         }
     }
 
     private static final long MAIN_SKOCKO_DURATION_MS = 30_000L;
+
+    private void seedSpojniceGames(DatabaseReference roomRef) {
+        db.child("Spojnice").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                List<DataSnapshot> all = new ArrayList<>();
+                for (DataSnapshot g : snapshot.getChildren()) all.add(g);
+                if (all.isEmpty()) return;
+                Collections.shuffle(all, random);
+                int count = Math.min(2, all.size());
+
+                java.util.Map<String, Object> gamesMap = new java.util.HashMap<>();
+                for (int i = 0; i < count; i++) {
+                    DataSnapshot src  = all.get(i);
+                    String desc       = src.child("description").getValue(String.class);
+                    gamesMap.put("games/" + i + "/description", desc != null ? desc : "");
+
+                    List<String> leftKeys   = new ArrayList<>();
+                    List<String> rightVals  = new ArrayList<>();
+                    for (DataSnapshot pair : src.child("pairs").getChildren()) {
+                        leftKeys .add(pair.getKey());
+                        rightVals.add(pair.getValue(String.class) != null
+                                ? pair.getValue(String.class) : "");
+                    }
+
+                    // Shuffle the right column so both players see the same shuffled board
+                    List<String> shuffledRights = new ArrayList<>(rightVals);
+                    Collections.shuffle(shuffledRights, random);
+
+                    for (int j = 0; j < leftKeys.size(); j++) {
+                        gamesMap.put("games/" + i + "/leftItems/"     + j, leftKeys.get(j));
+                        gamesMap.put("games/" + i + "/correctRights/"  + j, rightVals.get(j));
+                        gamesMap.put("games/" + i + "/shuffledRights/" + j, shuffledRights.get(j));
+                    }
+                    gamesMap.put("games/" + i + "/pairCount", leftKeys.size());
+                }
+                gamesMap.put("roundCount", count);
+                roomRef.updateChildren(gamesMap);
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
 
     private void seedKoZnaZnaQuestions(DatabaseReference roomRef) {
         db.child("KoZnaZna").addListenerForSingleValueEvent(new ValueEventListener() {
