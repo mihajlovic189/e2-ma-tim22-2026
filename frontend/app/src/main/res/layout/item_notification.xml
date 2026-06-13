@@ -5,59 +5,99 @@
     android:layout_height="wrap_content"
     android:layout_marginStart="12dp"
     android:layout_marginEnd="12dp"
-    android:layout_marginTop="8dp"
-    android:layout_marginBottom="8dp"
+    android:layout_marginTop="5dp"
+    android:layout_marginBottom="5dp"
     app:cardCornerRadius="12dp"
-    app:cardElevation="4dp">
+    app:cardElevation="3dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:gravity="center_vertical">
+        android:orientation="vertical">
 
-        <!-- Ikonica -->
-        <ImageView
-            android:id="@+id/ivIcon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/ic_popup_reminder"
-            android:layout_marginEnd="12dp"/>
-
-        <!-- Tekst -->
+        <!-- Gornji red: indikator + ikona + tekst + vrijeme -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:gravity="center_vertical">
 
+            <!-- Plava tačka za nepročitane -->
+            <View
+                android:id="@+id/unreadDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/circle_feedback_blue"
+                android:visibility="invisible"/>
+
+            <!-- Ikona tipa -->
+            <ImageView
+                android:id="@+id/ivIcon"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:src="@android:drawable/ic_dialog_info"/>
+
+            <!-- Naslov i opis -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvNaslov"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:textColor="#000000"/>
+
+                <TextView
+                    android:id="@+id/tvOpis"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="#555555"
+                    android:layout_marginTop="3dp"/>
+
+            </LinearLayout>
+
+            <!-- Timestamp -->
             <TextView
-                android:id="@+id/tvNaslov"
+                android:id="@+id/tvVrijeme"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textStyle="bold"
-                android:textSize="15sp"
-                android:textColor="#000000"/>
-
-            <TextView
-                android:id="@+id/tvOpis"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="13sp"
-                android:textColor="#666666"
-                android:layout_marginTop="4dp"/>
+                android:textSize="10sp"
+                android:textColor="#999999"
+                android:layout_marginStart="6dp"/>
 
         </LinearLayout>
 
-        <!-- Vrijeme -->
-        <TextView
-            android:id="@+id/tvVrijeme"
-            android:layout_width="wrap_content"
+        <!-- Donji red: dugme za akciju -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="11sp"
-            android:textColor="#999999"
-            android:layout_marginStart="8dp"/>
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:paddingEnd="12dp"
+            android:paddingBottom="10dp"
+            android:paddingTop="0dp">
+
+            <Button
+                android:id="@+id/btnAction"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:text="Detalji"
+                android:textSize="11sp"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#1565C0"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"/>
+
+        </LinearLayout>
 
     </LinearLayout>
 

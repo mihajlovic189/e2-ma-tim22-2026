@@ -15,3 +15,6 @@
 local.properties
 .idea/
 slagalica-mobilna-aplikacija-firebase-adminsdk-fbsvc-40593ce557.json
+
+# Claude AI history and project state
+.claude/
