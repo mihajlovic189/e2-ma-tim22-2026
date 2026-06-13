@@ -263,11 +263,6 @@ public class KorakPoKorakManager {
     }
 
     private boolean isRoundReady(String solution, java.util.List<String> steps) {
-        if (solution == null || solution.trim().isEmpty()) return false;
-        if (steps == null || steps.size() < 7) return false;
-        for (String step : steps) {
-            if (step == null || step.trim().isEmpty()) return false;
-        }
-        return true;
+        return solution != null && !solution.trim().isEmpty();
     }
 }

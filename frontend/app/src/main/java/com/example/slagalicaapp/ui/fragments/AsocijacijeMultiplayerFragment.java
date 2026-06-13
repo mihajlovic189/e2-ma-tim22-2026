@@ -139,6 +139,7 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
                                Set<String> newOpened,
                                Map<String, Integer> newColsSolved,
                                int newFinalSolvedBy,
+                               int newFinalGuessAttempts,
                                int newP1Score, int newP2Score) {
         requireActivity().runOnUiThread(() -> {
             if (isGameOver) return;
@@ -232,6 +233,13 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
 
     private void startGuessTimer(long durationMs) {
         if (guessTimer != null) { guessTimer.cancel(); guessTimer = null; }
+
+        long mainTimeRemaining = gameEndsAt - System.currentTimeMillis();
+        if (mainTimeRemaining <= 0) {
+            onGameTimerExpired();
+            return;
+        }
+
         if (!mainTimerPaused) {
             mainTimerPaused = true;
             if (headerController != null) headerController.stop();
@@ -276,8 +284,15 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
         freezeInput();
         Map<String, Object> upd = new HashMap<>();
         upd.put("activePlayer", 3 - myPlayerNumber);
-        upd.put("turnPhase",   "opening");
-        upd.put("turnEndsAt",  0L);
+
+        boolean allFieldsAreOpen = areAllFieldsOpen();
+        if (allFieldsAreOpen || columnsSolvedBy.size() >= 4) {
+            upd.put("turnPhase",   "guessing");
+            upd.put("turnEndsAt",  System.currentTimeMillis() + GUESS_DURATION_MS);
+        } else {
+            upd.put("turnPhase",   "opening");
+            upd.put("turnEndsAt",  0L);
+        }
         manager.commitAction(upd);
     }
 
@@ -326,8 +341,14 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
             showToast("Tačno! +" + gained + " bodova");
         } else {
             upd.put("activePlayer", 3 - myPlayerNumber);
-            upd.put("turnPhase",   "opening");
-            upd.put("turnEndsAt",  0L);
+            boolean allFieldsAreOpen = areAllFieldsOpen();
+            if (allFieldsAreOpen || columnsSolvedBy.size() >= 4) {
+                upd.put("turnPhase",   "guessing");
+                upd.put("turnEndsAt",  System.currentTimeMillis() + GUESS_DURATION_MS);
+            } else {
+                upd.put("turnPhase",   "opening");
+                upd.put("turnEndsAt",  0L);
+            }
             getEditTextForColumn(col).setText("");
             showToast("Netačno");
         }
@@ -361,8 +382,14 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
             showToast("POBEDA! +" + gained + " bodova");
         } else {
             upd.put("activePlayer", 3 - myPlayerNumber);
-            upd.put("turnPhase",   "opening");
-            upd.put("turnEndsAt",  0L);
+            boolean allFieldsAreOpen = areAllFieldsOpen();
+            if (allFieldsAreOpen || columnsSolvedBy.size() >= 4) {
+                upd.put("turnPhase",   "guessing");
+                upd.put("turnEndsAt",  System.currentTimeMillis() + GUESS_DURATION_MS);
+            } else {
+                upd.put("turnPhase",   "opening");
+                upd.put("turnEndsAt",  0L);
+            }
             binding.etFinalSolution.setText("");
             showToast("Netačno konačno rešenje");
         }
@@ -370,6 +397,27 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
     }
 
     // ─── Board reconstruction for local evaluation ───────────────────────────
+
+    private boolean areAllFieldsOpen() {
+        int openCount = openedFieldKeys.size();
+        for (Integer solvedByPlayer : columnsSolvedBy.values()) {
+            // This is tricky because we don't know which fields were open before column solve.
+            // A simple approximation is to assume a solved column adds unopened fields.
+            // Let's count solved columns and add 4 for each. This is imperfect.
+            // A better check is just the number of solved columns.
+        }
+        // A column is fully revealed when solved.
+        int revealedInSolvedColumns = columnsSolvedBy.size() * 4;
+        // However, some fields might have been open already.
+        // The most reliable check is to count open fields AND fields in solved columns.
+        Set<String> totalRevealed = new HashSet<>(openedFieldKeys);
+        for (String colLetter : columnsSolvedBy.keySet()) {
+            for (int i = 0; i < 4; i++) {
+                totalRevealed.add(colLetter + (i + 1));
+            }
+        }
+        return totalRevealed.size() >= 16;
+    }
 
     private AsocijacijeBoard reconstructBoard() {
         AsocijacijeBoard b = new AsocijacijeBoard(fields, columnSolutions, finalSolution);

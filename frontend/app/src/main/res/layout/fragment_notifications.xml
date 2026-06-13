@@ -1,106 +1,189 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    tools:context=".ui.fragments.NotificationsFragment">
+    android:background="#F0F4FF">
 
-    <!-- TABOVI NA VRHU -->
+    <!-- Naslov + test dugme -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="32dp">
+        android:gravity="center_vertical"
+        android:paddingTop="24dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Obavještenja"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#1A237E"
+            android:paddingStart="16dp"/>
 
         <Button
-            android:id="@+id/btnTab1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Čet"
+            android:id="@+id/btnAddTest"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="+ Test"
             android:textSize="11sp"
-            android:backgroundTint="#2196F3"
-            android:textColor="#FFFFFF"/>
-        <Button
-            android:id="@+id/btnTab2"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Rang"
-            android:textSize="11sp"
-            android:backgroundTint="#BBDEFB"
-            android:textColor="#000000"/>
-        <Button
-            android:id="@+id/btnTab3"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Nagrada"
-            android:textSize="11sp"
-            android:backgroundTint="#BBDEFB"
-            android:textColor="#000000"/>
-        <Button
-            android:id="@+id/btnTab4"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Ostalo"
-            android:textSize="11sp"
-            android:backgroundTint="#BBDEFB"
-            android:textColor="#000000"/>
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E65100"
+            android:layout_marginEnd="12dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"/>
+
     </LinearLayout>
 
-    <!-- FILTER DUGME -->
-    <LinearLayout
+    <!-- Tabovi po tipu (horizontalno skrolabilni) -->
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="end"
+        android:scrollbars="none"
+        android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="4dp">
 
-        <Button
-            android:id="@+id/btnFilter"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Sve"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnTabSve"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Sve"
+                android:textSize="12sp"
+                android:layout_marginEnd="6dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"/>
+
+            <Button
+                android:id="@+id/btnTabChat"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Čet"
+                android:textSize="12sp"
+                android:layout_marginEnd="6dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"/>
+
+            <Button
+                android:id="@+id/btnTabRanking"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Rang"
+                android:textSize="12sp"
+                android:layout_marginEnd="6dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"/>
+
+            <Button
+                android:id="@+id/btnTabRewards"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Nagrade"
+                android:textSize="12sp"
+                android:layout_marginEnd="6dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"/>
+
+            <Button
+                android:id="@+id/btnTabOther"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Ostalo"
+                android:textSize="12sp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"/>
+
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Filter pročitano/nepročitano -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Prikaži: "
             android:textSize="12sp"
-            android:backgroundTint="#607D8B"
-            android:textColor="#FFFFFF"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"/>
+            android:textColor="#555555"
+            android:layout_marginEnd="4dp"/>
+
+        <Button
+            android:id="@+id/btnFilterAll"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:text="Sve"
+            android:textSize="11sp"
+            android:layout_marginEnd="4dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"/>
+
+        <Button
+            android:id="@+id/btnFilterUnread"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:text="Nepročitane"
+            android:textSize="11sp"
+            android:layout_marginEnd="4dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"/>
+
+        <Button
+            android:id="@+id/btnFilterRead"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:text="Pročitane"
+            android:textSize="11sp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"/>
+
     </LinearLayout>
 
-    <!-- LISTE -->
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#C5CAE9"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"/>
+
+    <!-- Lista notifikacija -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvLista1"
+        android:id="@+id/recycler_view_notifications"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:visibility="visible"
-        tools:listitem="@android:layout/simple_list_item_1"/>
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvLista2"
+        android:clipToPadding="false"
+        android:paddingTop="4dp"
+        android:paddingBottom="16dp"/>
+
+    <!-- Prazno stanje -->
+    <TextView
+        android:id="@+id/empty_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:visibility="gone"
-        tools:listitem="@android:layout/simple_list_item_1"/>
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvLista3"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:visibility="gone"
-        tools:listitem="@android:layout/simple_list_item_1"/>
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvLista4"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:visibility="gone"
-        tools:listitem="@android:layout/simple_list_item_1"/>
+        android:gravity="center"
+        android:text="Nema obavještenja"
+        android:textSize="16sp"
+        android:textColor="#9E9E9E"
+        android:visibility="gone"/>
 
 </LinearLayout>

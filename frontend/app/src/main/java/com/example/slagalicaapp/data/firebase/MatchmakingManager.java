@@ -173,12 +173,12 @@ public class MatchmakingManager {
                 roomRef.child("currentStep").setValue(-1);
                 roomRef.child("roundStatus").setValue("playing");
                 seedKorakRoundsFromPool(roomRef);
-                seedMojBrojRoom(roomId, playerName, null, playerUid, null, startedAt);
             } else if (gameType.equals("MOJ_BROJ")) {
                 roomRef.child("activePlayer").setValue(1);
                 roomRef.child("roundStatus").setValue("playing");
                 roomRef.child("targetRevealed").setValue(false);
                 roomRef.child("numbersRevealed").setValue(false);
+                roomRef.child("roundEndsAt").setValue(0L);
             } else if (gameType.equals("SKOCKO")) {
                 roomRef.child("secret1").setValue(generateSkockoSecret());
                 roomRef.child("secret2").setValue(generateSkockoSecret());
@@ -200,9 +200,7 @@ public class MatchmakingManager {
             roomRef.child("player2").setValue(playerName);
             roomRef.child("player2Uid").setValue(playerUid);
             roomRef.child("status").setValue("playing");
-            if (gameType.equals("KORAK_PO_KORAK")) {
-                seedMojBrojRoom(roomId, null, playerName, null, playerUid, null);
-            } else if (gameType.equals("SKOCKO")) {
+            if (gameType.equals("SKOCKO")) {
                 // Reset phaseEndsAt to now so both players get a fresh countdown
                 roomRef.child("phaseEndsAt")
                         .setValue(System.currentTimeMillis() + MAIN_SKOCKO_DURATION_MS);

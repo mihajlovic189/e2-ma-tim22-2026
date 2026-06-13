@@ -1,119 +1,130 @@
 package com.example.slagalicaapp.ui.adapters;
 
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.slagalicaapp.R;
-import com.example.slagalicaapp.repositories.NotificationRepository;
+import com.example.slagalicaapp.model.NotificationModel;
 
-import java.util.ArrayList;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
-public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapter.ViewHolder> {
+public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapter.NotificationViewHolder> {
 
-    public static class NotificationItem {
-        public String id;
-        public String naslov;
-        public String opis;
-        public String vrijeme;
-        public boolean procitana;
-
-        public NotificationItem(String id, String naslov, String opis, String vrijeme, boolean procitana) {
-            this.id = id;
-            this.naslov = naslov;
-            this.opis = opis;
-            this.vrijeme = vrijeme;
-            this.procitana = procitana;
-        }
+    public interface NotificationListener {
+        void onMarkRead(NotificationModel n);
+        void onAction(NotificationModel n);
     }
 
-    public static final int FILTER_SVE        = 0;
-    public static final int FILTER_NEPROCITANE = 1;
-    public static final int FILTER_PROCITANE   = 2;
+    private List<NotificationModel> notifications;
+    private final NotificationListener listener;
+    private final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault());
 
-    private final NotificationRepository repo;
-    private List<NotificationItem> sveStavke    = new ArrayList<>();
-    private List<NotificationItem> prikazaneStavke = new ArrayList<>();
-    private int trenutniFilter = FILTER_SVE;
-
-    public NotificationAdapter(NotificationRepository repo) {
-        this.repo = repo;
-    }
-
-    public void updateItems(List<NotificationItem> items) {
-        sveStavke = items;
-        setFilter(trenutniFilter);
-    }
-
-    public void setFilter(int filter) {
-        trenutniFilter = filter;
-        prikazaneStavke = new ArrayList<>();
-        for (NotificationItem item : sveStavke) {
-            if (filter == FILTER_SVE) {
-                prikazaneStavke.add(item);
-            } else if (filter == FILTER_PROCITANE && item.procitana) {
-                prikazaneStavke.add(item);
-            } else if (filter == FILTER_NEPROCITANE && !item.procitana) {
-                prikazaneStavke.add(item);
-            }
-        }
-        notifyDataSetChanged();
+    public NotificationAdapter(List<NotificationModel> notifications, NotificationListener listener) {
+        this.notifications = notifications;
+        this.listener = listener;
     }
 
     @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_notification, parent, false);
-        return new ViewHolder(view);
+    public NotificationViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_notification, parent, false);
+        return new NotificationViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        NotificationItem item = prikazaneStavke.get(position);
-        holder.tvNaslov.setText(item.naslov);
-        holder.tvOpis.setText(item.opis);
-        holder.tvVrijeme.setText(item.vrijeme);
+    public void onBindViewHolder(@NonNull NotificationViewHolder holder, int position) {
+        NotificationModel n = notifications.get(position);
 
-        if (item.procitana) {
-            holder.itemView.setBackgroundColor(0xFFCFD8DC);
-            holder.tvNaslov.setTextColor(0xFF607D8B);
-            holder.tvOpis.setTextColor(0xFF90A4AE);
-            holder.tvVrijeme.setTextColor(0xFF90A4AE);
+        holder.title.setText(n.getTitle());
+        holder.body.setText(n.getBody());
+        holder.timestamp.setText(sdf.format(new Date(n.getTimestamp())));
+
+        // Read / unread visual
+        if (n.isRead()) {
+            holder.card.setCardBackgroundColor(Color.parseColor("#F5F5F5"));
+            holder.title.setAlpha(0.55f);
+            holder.body.setAlpha(0.55f);
+            holder.unreadDot.setVisibility(View.INVISIBLE);
         } else {
-            holder.itemView.setBackgroundColor(0xFFFFFFFF);
-            holder.tvNaslov.setTextColor(0xFF000000);
-            holder.tvOpis.setTextColor(0xFF333333);
-            holder.tvVrijeme.setTextColor(0xFF555555);
+            holder.card.setCardBackgroundColor(Color.WHITE);
+            holder.title.setAlpha(1.0f);
+            holder.body.setAlpha(1.0f);
+            holder.unreadDot.setVisibility(View.VISIBLE);
         }
 
+        // Type icon
+        switch (n.getType()) {
+            case "chat":
+                holder.typeIcon.setImageResource(android.R.drawable.ic_menu_send);
+                break;
+            case "ranking":
+                holder.typeIcon.setImageResource(R.drawable.ic_zvezda);
+                break;
+            case "rewards":
+                holder.typeIcon.setImageResource(android.R.drawable.ic_popup_reminder);
+                break;
+            default:
+                holder.typeIcon.setImageResource(android.R.drawable.ic_dialog_info);
+                break;
+        }
+
+        // Action button label
+        switch (n.getType()) {
+            case "chat":    holder.btnAction.setText("Otvori čet");   break;
+            case "ranking": holder.btnAction.setText("Rang lista");   break;
+            case "rewards": holder.btnAction.setText("Preuzmi");      break;
+            default:        holder.btnAction.setText("Detalji");      break;
+        }
+
+        // Click on whole card → mark as read
         holder.itemView.setOnClickListener(v -> {
-            if (!item.procitana) {
-                item.procitana = true;
-                repo.oznacKaoProcitanu(item.id);
-                setFilter(trenutniFilter);
-            }
+            if (!n.isRead()) listener.onMarkRead(n);
         });
+
+        // Action button click
+        holder.btnAction.setOnClickListener(v -> listener.onAction(n));
     }
 
     @Override
     public int getItemCount() {
-        return prikazaneStavke.size();
+        return notifications.size();
     }
 
-    public static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvNaslov, tvOpis, tvVrijeme;
+    public void updateData(List<NotificationModel> newNotifications) {
+        this.notifications = newNotifications;
+        notifyDataSetChanged();
+    }
 
-        public ViewHolder(@NonNull View itemView) {
+    static class NotificationViewHolder extends RecyclerView.ViewHolder {
+        CardView card;
+        View unreadDot;
+        ImageView typeIcon;
+        TextView title;
+        TextView body;
+        TextView timestamp;
+        Button btnAction;
+
+        public NotificationViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvNaslov  = itemView.findViewById(R.id.tvNaslov);
-            tvOpis    = itemView.findViewById(R.id.tvOpis);
-            tvVrijeme = itemView.findViewById(R.id.tvVrijeme);
+            card = (CardView) itemView;
+            unreadDot = itemView.findViewById(R.id.unreadDot);
+            typeIcon = itemView.findViewById(R.id.ivIcon);
+            title = itemView.findViewById(R.id.tvNaslov);
+            body = itemView.findViewById(R.id.tvOpis);
+            timestamp = itemView.findViewById(R.id.tvVrijeme);
+            btnAction = itemView.findViewById(R.id.btnAction);
         }
     }
 }
