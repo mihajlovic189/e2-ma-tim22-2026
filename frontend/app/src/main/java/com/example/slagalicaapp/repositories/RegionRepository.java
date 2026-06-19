@@ -3,9 +3,11 @@ package com.example.slagalicaapp.repositories;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.slagalicaapp.data.models.League;
 import com.example.slagalicaapp.data.models.PlayerLeaderboardEntry;
 import com.example.slagalicaapp.data.models.PlayerMapDot;
 import com.example.slagalicaapp.data.models.RegionData;
+import com.example.slagalicaapp.utils.LeagueManager;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -273,11 +275,17 @@ public class RegionRepository {
     private void computeAndSaveRank(String cycleMonth, String uid, String userRegion) {
         db.collection("users").get().addOnSuccessListener(snapshots -> {
             Map<String, Integer> starsMap = initRegionIntMap();
+            int userTotalStars = 0;
 
             for (QueryDocumentSnapshot doc : snapshots) {
                 String region = doc.getString("region");
                 if (region == null || !starsMap.containsKey(region)) continue;
-                // Use previousMonthlyStars where previousCycleMonth == cycleMonth
+
+                if (doc.getId().equals(uid)) {
+                    Long ts = doc.getLong("totalStars");
+                    userTotalStars = ts != null ? ts.intValue() : 0;
+                }
+
                 String prevMonth = doc.getString("previousCycleMonth");
                 if (cycleMonth.equals(prevMonth)) {
                     Long ps = doc.getLong("previousMonthlyStars");
@@ -294,7 +302,19 @@ public class RegionRepository {
                 if (sorted.get(i).equals(userRegion)) { rank = i + 1; break; }
             }
 
-            db.collection("users").document(uid).update("previousCycleRank", rank);
+            // Build the base update
+            Map<String, Object> userUpdate = new HashMap<>();
+            userUpdate.put("previousCycleRank", (long) rank);
+
+            // Apply 30 % star penalty if the player's region did not finish top-3
+            if (rank == 0 || rank > 3) {
+                int penalisedStars = LeagueManager.applyMonthlyPenalty(userTotalStars);
+                League newLeague  = LeagueManager.forStars(penalisedStars);
+                userUpdate.put("totalStars", (long) penalisedStars);
+                userUpdate.put("leagueName", newLeague.name);
+            }
+
+            db.collection("users").document(uid).update(userUpdate);
 
             // Update cumulative place counts for top 3 regions
             String[] placeFields = {"firstPlaces", "secondPlaces", "thirdPlaces"};

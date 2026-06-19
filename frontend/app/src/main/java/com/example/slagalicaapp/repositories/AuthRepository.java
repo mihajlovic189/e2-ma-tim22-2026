@@ -3,8 +3,10 @@ package com.example.slagalicaapp.repositories;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.slagalicaapp.data.models.League;
 import com.example.slagalicaapp.data.models.ProfileData;
 import com.example.slagalicaapp.data.models.User;
+import com.example.slagalicaapp.utils.LeagueManager;
 import com.example.slagalicaapp.repositories.RegionRepository;
 import com.example.slagalicaapp.model.GameResult;
 import com.google.android.gms.tasks.Task;
@@ -113,7 +115,7 @@ public class AuthRepository {
         userData.put("qrPayload", buildQrPayload(uid, user.getUsername()));
         userData.put("averageScoreRanges", buildDefaultAverageScoreRanges());
         userData.put("detailedStats", buildDefaultDetailedStats());
-        userData.put("leagueName", isGuest ? "Nema lige" : "Bronzana liga");
+        userData.put("leagueName", "Rookie");
 
         // Region map position — random point within the player's region
         float[] mapCoords = RegionRepository.generateRandomMapCoords(user.getRegion());
@@ -618,8 +620,46 @@ public class AuthRepository {
         updates.put("totalGamesPlayed", profileData.getTotalGamesPlayed());
         updates.put("wins", profileData.getWins());
         updates.put("losses", profileData.getLosses());
+        updates.put("leagueName", profileData.getLeagueName());
 
         db.collection("users").document(uid).update(updates);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Zvezde i liga
+    // ──────────────────────────────────────────────
+
+    /**
+     * Adds (or subtracts) stars for the current user, recomputes the league,
+     * persists both to Firestore, and emits the new league name.
+     * Emits null if the user is not logged in or on failure.
+     *
+     * Call this from game-completion handlers instead of writing totalStars directly.
+     */
+    public LiveData<String> updateStarsAndLeague(int starsDelta) {
+        MutableLiveData<String> result = new MutableLiveData<>();
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null) { result.setValue(null); return result; }
+
+        db.collection("users").document(user.getUid()).get()
+                .addOnSuccessListener(doc -> {
+                    int currentStars = doc.getLong("totalStars") != null
+                            ? doc.getLong("totalStars").intValue() : 0;
+                    int newStars = Math.max(0, currentStars + starsDelta);
+
+                    League newLeague = LeagueManager.forStars(newStars);
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("totalStars", (long) newStars);
+                    updates.put("leagueName", newLeague.name);
+
+                    db.collection("users").document(user.getUid()).update(updates)
+                            .addOnSuccessListener(unused -> result.setValue(newLeague.name))
+                            .addOnFailureListener(e -> result.setValue(null));
+                })
+                .addOnFailureListener(e -> result.setValue(null));
+
+        return result;
     }
 
     // ──────────────────────────────────────────────
@@ -684,11 +724,23 @@ public class AuthRepository {
         profileData.setEmail(stringValue(doc.getString("email"), currentUser.getEmail()));
         profileData.setRegion(stringValue(doc.getString("region"), "Nepoznat region"));
         profileData.setAvatarUri(stringValue(doc.getString("avatarUri"), ""));
-        profileData.setLeagueName(stringValue(doc.getString("leagueName"), "Bronzana liga"));
+        // leagueName is computed from totalStars below — skip stored value here.
         profileData.setQrPayload(stringValue(doc.getString("qrPayload"),
                 buildQrPayload(currentUser.getUid(), profileData.getUsername())));
         profileData.setTokenCount(readInt(doc.get("tokenCount"), 0));
-        profileData.setTotalStars(readInt(doc.get("totalStars"), 0));
+
+        int totalStars = readInt(doc.get("totalStars"), 0);
+        profileData.setTotalStars(totalStars);
+
+        // Always compute league from totalStars — do not trust the stored value.
+        String storedLeagueName = stringValue(doc.getString("leagueName"), "Početnik");
+        League computedLeague = LeagueManager.forStars(totalStars);
+        profileData.setLeagueName(computedLeague.name);
+        if (!computedLeague.name.equals(storedLeagueName)) {
+            profileData.setLeagueChangedFrom(storedLeagueName);
+            profileData.setLeagueChangedTo(computedLeague.name);
+        }
+
         profileData.setTotalGamesPlayed(readInt(doc.get("totalGamesPlayed"), 0));
         profileData.setWins(readInt(doc.get("wins"), 0));
         profileData.setLosses(readInt(doc.get("losses"), 0));

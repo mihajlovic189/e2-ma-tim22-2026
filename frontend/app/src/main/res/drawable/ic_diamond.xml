@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- top-left facet -->
+    <path
+        android:fillColor="#7BE8FF"
+        android:pathData="M2,9 L7,4 L12,9 Z"/>
+    <!-- top-right facet -->
+    <path
+        android:fillColor="#4DD0E1"
+        android:pathData="M12,9 L17,4 L22,9 Z"/>
+    <!-- left facet -->
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M2,9 L12,9 L12,21 Z"/>
+    <!-- right facet -->
+    <path
+        android:fillColor="#0097A7"
+        android:pathData="M12,9 L22,9 L12,21 Z"/>
+    <!-- top band outline -->
+    <path
+        android:fillColor="#B2EBF2"
+        android:pathData="M7,4 L17,4 L22,9 L2,9 Z"/>
+</vector>

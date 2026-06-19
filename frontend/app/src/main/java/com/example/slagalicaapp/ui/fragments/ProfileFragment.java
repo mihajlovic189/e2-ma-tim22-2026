@@ -107,6 +107,11 @@ public class ProfileFragment extends Fragment {
         renderStatGroup(binding.llAverageStats, profileData.getAverageScoreRanges());
         renderStatGroup(binding.llDetailedStats, profileData.getDetailedStats());
         renderQrCode(profileData.getQrPayload());
+
+        if (profileData.getLeagueChangedTo() != null) {
+            showLeagueChangeDialog(profileData.getLeagueChangedFrom(),
+                    profileData.getLeagueChangedTo());
+        }
     }
 
     private void applyAvatarFrame(int previousCycleRank) {
@@ -144,20 +149,53 @@ public class ProfileFragment extends Fragment {
     }
 
     private void setLeagueIcon(String leagueName) {
-        String normalized = leagueName == null ? "" : leagueName.toLowerCase();
+        String n = leagueName == null ? "" : leagueName.toLowerCase();
         int iconRes;
-
-        if (normalized.contains("gold")) {
+        if (n.contains("master")) {
+            iconRes = R.drawable.ic_trophy;
+        } else if (n.contains("diamond")) {
+            iconRes = R.drawable.ic_diamond;
+        } else if (n.contains("gold")) {
             iconRes = android.R.drawable.btn_star_big_on;
-        } else if (normalized.contains("srebr") || normalized.contains("silver")) {
-            iconRes = android.R.drawable.star_big_on;
-        } else if (normalized.contains("bron")) {
-            iconRes = android.R.drawable.star_big_off;
+        } else if (n.contains("silver")) {
+            iconRes = android.R.drawable.star_big_off;   // swapped: silver gets bronze drawable
+        } else if (n.contains("bronze")) {
+            iconRes = android.R.drawable.star_big_on;    // swapped: bronze gets silver drawable
         } else {
-            iconRes = android.R.drawable.ic_menu_compass;
+            iconRes = android.R.drawable.ic_menu_compass; // Rookie
         }
-
         binding.ivLeagueIcon.setImageResource(iconRes);
+    }
+
+    private void showLeagueChangeDialog(String from, String to) {
+        if (!isAdded() || getContext() == null) return;
+
+        boolean promoted = isPromotion(from, to);
+        String title   = promoted ? "🎉 Napredovanje u ligi!" : "⬇ Pad u ligi";
+        String message = promoted
+                ? "Čestitamo! Napredovao si iz lige\n\"" + from + "\"\nu ligu\n\"" + to + "\"!"
+                : "Pao si iz lige\n\"" + from + "\"\nu ligu\n\"" + to + "\".";
+
+        new android.app.AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("U redu", null)
+                .show();
+    }
+
+    private boolean isPromotion(String from, String to) {
+        int fromIdx = leagueIndex(from);
+        int toIdx   = leagueIndex(to);
+        return toIdx > fromIdx;
+    }
+
+    private int leagueIndex(String name) {
+        if (name == null) return 0;
+        for (com.example.slagalicaapp.data.models.League l :
+                com.example.slagalicaapp.utils.LeagueManager.LEAGUES) {
+            if (l.name.equals(name)) return l.index;
+        }
+        return 0;
     }
 
     private void renderStatGroup(LinearLayout container, Map<String, String> stats) {
@@ -224,7 +262,7 @@ public class ProfileFragment extends Fragment {
         profileData.setUsername("Igrač");
         profileData.setEmail("Nije dostupno");
         profileData.setRegion("Nepoznat region");
-        profileData.setLeagueName("Bronzana liga");
+        profileData.setLeagueName("Rookie");
         profileData.setQrPayload("slagalica://invite?uid=local&username=Igrač");
         profileData.setTokenCount(0);
         profileData.setTotalStars(0);

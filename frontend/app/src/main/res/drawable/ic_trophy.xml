@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- cup body -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M5,3 L19,3 L19,13 C19,17 16,19 12,19 C8,19 5,17 5,13 Z"/>
+    <!-- left handle -->
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M5,6 C5,6 2,7 2,10 C2,13 5,13 5,13 Z"/>
+    <!-- right handle -->
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M19,6 C19,6 22,7 22,10 C22,13 19,13 19,13 Z"/>
+    <!-- stem -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M10,19 L14,19 L14,21 L10,21 Z"/>
+    <!-- base -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M7,21 L17,21 L17,23 L7,23 Z"/>
+    <!-- shine -->
+    <path
+        android:fillColor="#FFF9C4"
+        android:pathData="M8,5 C8,5 9,4 11,4 C11,4 10,6 8,7 Z"/>
+</vector>
