@@ -254,26 +254,29 @@ public class SerbiaMapView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() != MotionEvent.ACTION_UP)
-            return super.onTouchEvent(event);
+        // Always return true for ACTION_DOWN so Android delivers ACTION_UP to this view.
+        // Without this, super returns false (view is not clickable), and ACTION_UP is never sent.
+        if (event.getAction() == MotionEvent.ACTION_DOWN) return true;
 
-        float sx = getWidth()  / CW;
-        float sy = getHeight() / CH;
-        float px = event.getX() / sx;
-        float py = event.getY() / sy;
+        if (event.getAction() == MotionEvent.ACTION_UP) {
+            float sx = getWidth()  / CW;
+            float sy = getHeight() / CH;
+            float px = event.getX() / sx;
+            float py = event.getY() / sy;
 
-        // Check Beograd first — it's small and sits inside Centralna's bounding box
-        String[] hitOrder = {"Beograd", "Vojvodina", "Centralna Srbija", "Južna Srbija"};
-        synchronized (regionPolygons) {
-            for (String region : hitOrder) {
-                List<float[]> polys = regionPolygons.get(region);
-                if (polys == null) continue;
-                for (float[] poly : polys) {
-                    if (inPoly(px, py, poly)) {
-                        selectedRegion = region;
-                        invalidate();
-                        if (listener != null) listener.onRegionClick(region);
-                        return true;
+            // Check Beograd first — it's small and sits inside Centralna's bounding box
+            String[] hitOrder = {"Beograd", "Vojvodina", "Centralna Srbija", "Južna Srbija"};
+            synchronized (regionPolygons) {
+                for (String region : hitOrder) {
+                    List<float[]> polys = regionPolygons.get(region);
+                    if (polys == null) continue;
+                    for (float[] poly : polys) {
+                        if (inPoly(px, py, poly)) {
+                            selectedRegion = region;
+                            invalidate();
+                            if (listener != null) listener.onRegionClick(region);
+                            return true;
+                        }
                     }
                 }
             }

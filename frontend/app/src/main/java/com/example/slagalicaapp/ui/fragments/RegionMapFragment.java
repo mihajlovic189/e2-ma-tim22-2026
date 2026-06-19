@@ -1,5 +1,6 @@
 package com.example.slagalicaapp.ui.fragments;
 
+import android.app.AlertDialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -8,6 +9,8 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -74,7 +77,36 @@ public class RegionMapFragment extends Fragment {
     private void setupMapClick() {
         binding.serbiaMapView.setOnRegionClickListener(regionName -> {
             binding.serbiaMapView.setSelectedRegion(regionName);
+            fetchAndShowStats(regionName);
         });
+    }
+
+    private void fetchAndShowStats(String regionName) {
+        LiveData<RegionData> ld = viewModel.getRegionStats(regionName);
+        ld.observe(getViewLifecycleOwner(), new Observer<RegionData>() {
+            @Override
+            public void onChanged(RegionData rd) {
+                ld.removeObserver(this);
+                if (rd != null) showRegionStatsDialog(rd);
+            }
+        });
+    }
+
+    private void showRegionStatsDialog(RegionData rd) {
+        if (!isAdded() || getContext() == null) return;
+
+        String message =
+                "🥇 Prvo mesto: "    + rd.getFirstPlaces()      + "×\n" +
+                "🥈 Drugo mesto: "   + rd.getSecondPlaces()     + "×\n" +
+                "🥉 Treće mesto: "   + rd.getThirdPlaces()      + "×\n\n" +
+                "👥 Ukupno registrovanih: " + rd.getTotalPlayerCount() + "\n" +
+                "🟢 Trenutno aktivnih: "    + rd.getActivePlayerCount();
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle(rd.getIconEmoji() + "  " + rd.getName())
+                .setMessage(message)
+                .setPositiveButton("Zatvori", null)
+                .show();
     }
 
     private void loadData() {
