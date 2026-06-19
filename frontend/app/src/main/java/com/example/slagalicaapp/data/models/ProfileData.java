@@ -18,6 +18,8 @@ public class ProfileData {
     private int wins;
     private int losses;
     private int previousCycleRank;
+    private String leagueChangedFrom;
+    private String leagueChangedTo;
     private Map<String, String> averageScoreRanges = new LinkedHashMap<>();
     private Map<String, String> detailedStats = new LinkedHashMap<>();
 
@@ -119,6 +121,11 @@ public class ProfileData {
 
     public int getPreviousCycleRank() { return previousCycleRank; }
     public void setPreviousCycleRank(int rank) { this.previousCycleRank = rank; }
+
+    public String getLeagueChangedFrom() { return leagueChangedFrom; }
+    public void setLeagueChangedFrom(String from) { this.leagueChangedFrom = from; }
+    public String getLeagueChangedTo() { return leagueChangedTo; }
+    public void setLeagueChangedTo(String to) { this.leagueChangedTo = to; }
 
     public Map<String, String> getAverageScoreRanges() {
         return averageScoreRanges;

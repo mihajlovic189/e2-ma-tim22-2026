@@ -42,4 +42,13 @@ public class AuthViewModel extends ViewModel {
     public LiveData<String> resetPassword(String oldPass, String newPass) {
         return authRepository.changePassword(oldPass, newPass);
     }
+
+    /**
+     * Updates the player's total stars by delta (positive = gain, negative = loss),
+     * recomputes the league, persists both to Firestore, and returns the new league name.
+     * Call this from game-completion screens.
+     */
+    public LiveData<String> updateStarsAndLeague(int starsDelta) {
+        return authRepository.updateStarsAndLeague(starsDelta);
+    }
 }
