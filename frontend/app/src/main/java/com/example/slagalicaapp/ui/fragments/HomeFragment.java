@@ -95,6 +95,12 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
+        binding.btnRegionMap.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new RegionMapFragment())
+                        .addToBackStack(null)
+                        .commit());
+
         return binding.getRoot();
     }
 

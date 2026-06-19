@@ -5,6 +5,7 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.example.slagalicaapp.data.models.ProfileData;
 import com.example.slagalicaapp.data.models.User;
+import com.example.slagalicaapp.repositories.RegionRepository;
 import com.example.slagalicaapp.model.GameResult;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
@@ -113,6 +114,18 @@ public class AuthRepository {
         userData.put("averageScoreRanges", buildDefaultAverageScoreRanges());
         userData.put("detailedStats", buildDefaultDetailedStats());
         userData.put("leagueName", isGuest ? "Nema lige" : "Bronzana liga");
+
+        // Region map position — random point within the player's region
+        float[] mapCoords = RegionRepository.generateRandomMapCoords(user.getRegion());
+        userData.put("mapX", (double) mapCoords[0]);
+        userData.put("mapY", (double) mapCoords[1]);
+
+        // Monthly cycle tracking
+        userData.put("monthlyStars", 0L);
+        userData.put("cycleMonth", "");
+        userData.put("previousCycleRank", 0L);
+        userData.put("previousMonthlyStars", 0L);
+        userData.put("previousCycleMonth", "");
 
         db.collection("users").document(uid)
                 .set(userData)
@@ -679,6 +692,7 @@ public class AuthRepository {
         profileData.setTotalGamesPlayed(readInt(doc.get("totalGamesPlayed"), 0));
         profileData.setWins(readInt(doc.get("wins"), 0));
         profileData.setLosses(readInt(doc.get("losses"), 0));
+        profileData.setPreviousCycleRank(readInt(doc.get("previousCycleRank"), 0));
         profileData.setAverageScoreRanges(
                 readMap(doc.get("averageScoreRanges"), buildDefaultAverageScoreRanges()));
         profileData.setDetailedStats(
