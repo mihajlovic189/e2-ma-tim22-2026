@@ -17,6 +17,7 @@ public class ProfileData {
     private int totalGamesPlayed;
     private int wins;
     private int losses;
+    private int previousCycleRank;
     private Map<String, String> averageScoreRanges = new LinkedHashMap<>();
     private Map<String, String> detailedStats = new LinkedHashMap<>();
 
@@ -115,6 +116,9 @@ public class ProfileData {
     public void setLosses(int losses) {
         this.losses = losses;
     }
+
+    public int getPreviousCycleRank() { return previousCycleRank; }
+    public void setPreviousCycleRank(int rank) { this.previousCycleRank = rank; }
 
     public Map<String, String> getAverageScoreRanges() {
         return averageScoreRanges;

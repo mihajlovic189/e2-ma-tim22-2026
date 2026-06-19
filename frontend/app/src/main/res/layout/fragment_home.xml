@@ -77,6 +77,15 @@
             android:textColor="@color/text"
             android:backgroundTint="@color/primary" />
 
+        <Button
+            android:id="@+id/btnRegionMap"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="🗺  Mapa regiona"
+            android:textColor="@color/text"
+            android:backgroundTint="#1E3A5F" />
+
     </LinearLayout>
 
     <ImageButton

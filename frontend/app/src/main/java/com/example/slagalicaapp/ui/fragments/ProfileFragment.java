@@ -15,6 +15,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -102,9 +103,31 @@ public class ProfileFragment extends Fragment {
 
         setAvatar(profileData.getAvatarUri());
         setLeagueIcon(profileData.getLeagueName());
+        applyAvatarFrame(profileData.getPreviousCycleRank());
         renderStatGroup(binding.llAverageStats, profileData.getAverageScoreRanges());
         renderStatGroup(binding.llDetailedStats, profileData.getDetailedStats());
         renderQrCode(profileData.getQrPayload());
+    }
+
+    private void applyAvatarFrame(int previousCycleRank) {
+        int strokeColor;
+        int strokeWidthDp;
+        if (previousCycleRank == 1) {
+            strokeColor = Color.parseColor("#FFD700");
+            strokeWidthDp = 4;
+        } else if (previousCycleRank == 2) {
+            strokeColor = Color.parseColor("#C0C0C0");
+            strokeWidthDp = 4;
+        } else if (previousCycleRank == 3) {
+            strokeColor = Color.parseColor("#CD7F32");
+            strokeWidthDp = 4;
+        } else {
+            strokeColor = ContextCompat.getColor(requireContext(), R.color.primary);
+            strokeWidthDp = 2;
+        }
+        binding.cardAvatar.setStrokeColor(strokeColor);
+        float density = getResources().getDisplayMetrics().density;
+        binding.cardAvatar.setStrokeWidth((int) (strokeWidthDp * density));
     }
 
     private void setAvatar(String avatarUri) {
