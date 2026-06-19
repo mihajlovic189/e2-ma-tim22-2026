@@ -42,10 +42,12 @@ public class RegionRepository {
     // Random dot placement bounds per region [minX, maxX, minY, maxY] in internal 100×120 space
     private static final Map<String, float[]> REGION_DOT_BOUNDS = new HashMap<>();
     static {
-        REGION_DOT_BOUNDS.put("Vojvodina",        new float[]{5f, 70f,  2f, 27f});
-        REGION_DOT_BOUNDS.put("Beograd",          new float[]{40f, 53f, 37f, 44f});
-        REGION_DOT_BOUNDS.put("Centralna Srbija", new float[]{5f, 88f, 32f, 62f});
-        REGION_DOT_BOUNDS.put("Južna Srbija",     new float[]{10f, 85f, 66f, 98f});
+        // Bounds are in the normalised 100×120 internal space matching SerbiaMapView
+        // (lng [18.8099,22.9577] → x [0,100], lat [46.1894,42.2276] → y [0,120])
+        REGION_DOT_BOUNDS.put("Vojvodina",        new float[]{ 5f, 58f,  3f, 47f});
+        REGION_DOT_BOUNDS.put("Beograd",          new float[]{30f, 47f, 37f, 55f});
+        REGION_DOT_BOUNDS.put("Centralna Srbija", new float[]{ 8f, 52f, 55f, 90f});
+        REGION_DOT_BOUNDS.put("Južna Srbija",     new float[]{53f, 96f, 55f, 115f});
     }
 
     public static String getIconForRegion(String region) {
