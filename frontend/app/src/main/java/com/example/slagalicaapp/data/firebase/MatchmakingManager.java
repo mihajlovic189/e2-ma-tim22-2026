@@ -374,6 +374,28 @@ public class MatchmakingManager {
     }
 
 
+    // ── Direct (friend-invite) match helpers ─────────────────────────────────
+
+    /**
+     * Creates a game room as player 1 without going through the queue.
+     * Used by the friend-invite flow. Returns the pre-generated roomId.
+     */
+    public String createDirectRoom() {
+        String roomId = db.child("rooms").child(gameType).push().getKey();
+        if (roomId != null) createRoom(roomId, 1);
+        return roomId;
+    }
+
+    /**
+     * Joins an existing room as player 2 and notifies the listener via
+     * {@code onMatchFound(roomId, 2)}. Used when the invited friend accepts.
+     */
+    public void joinDirectRoom(String roomId) {
+        createRoom(roomId, 2);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     public void stopListening() {
         if (queueListener != null && myQueueKey != null) {
             db.child("queue").child(gameType).child(myQueueKey)

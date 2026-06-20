@@ -113,6 +113,8 @@ public class AuthRepository {
         userData.put("wins", 0);
         userData.put("losses", 0);
         userData.put("qrPayload", buildQrPayload(uid, user.getUsername()));
+        userData.put("usernameLower", user.getUsername() != null
+                ? user.getUsername().toLowerCase(java.util.Locale.getDefault()) : "");
         userData.put("averageScoreRanges", buildDefaultAverageScoreRanges());
         userData.put("detailedStats", buildDefaultDetailedStats());
         userData.put("leagueName", "Rookie");
@@ -260,6 +262,15 @@ public class AuthRepository {
         db.collection("users").document(uid)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.getDouble("mapX") == null) {
+                        String region = documentSnapshot.getString("region");
+                        float[] coords = RegionRepository.generateRandomMapCoords(
+                                region != null ? region : "Centralna Srbija");
+                        Map<String, Object> fix = new HashMap<>();
+                        fix.put("mapX", (double) coords[0]);
+                        fix.put("mapY", (double) coords[1]);
+                        db.collection("users").document(uid).update(fix);
+                    }
                     ProfileData profileData = mapProfile(currentUser, documentSnapshot);
                     fetchAndComputeStats(uid, profileData, result);
                 })
@@ -641,6 +652,9 @@ public class AuthRepository {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user == null) { result.setValue(null); return result; }
 
+        String currentMonth = new java.text.SimpleDateFormat("yyyy-MM",
+                java.util.Locale.getDefault()).format(new java.util.Date());
+
         db.collection("users").document(user.getUid()).get()
                 .addOnSuccessListener(doc -> {
                     int currentStars = doc.getLong("totalStars") != null
@@ -652,6 +666,17 @@ public class AuthRepository {
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("totalStars", (long) newStars);
                     updates.put("leagueName", newLeague.name);
+
+                    // Track monthly stars for regional leaderboard
+                    String cycleMonth = doc.getString("cycleMonth");
+                    if (currentMonth.equals(cycleMonth)) {
+                        int monthly = doc.getLong("monthlyStars") != null
+                                ? doc.getLong("monthlyStars").intValue() : 0;
+                        updates.put("monthlyStars", (long) Math.max(0, monthly + starsDelta));
+                    } else {
+                        updates.put("monthlyStars", (long) Math.max(0, starsDelta));
+                        updates.put("cycleMonth", currentMonth);
+                    }
 
                     db.collection("users").document(user.getUid()).update(updates)
                             .addOnSuccessListener(unused -> result.setValue(newLeague.name))
@@ -687,6 +712,12 @@ public class AuthRepository {
     }
 
     public void logout() {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user != null) {
+            FirebaseDatabase.getInstance().getReference()
+                    .child("status").child(user.getUid())
+                    .child("isOnline").setValue(false);
+        }
         mAuth.signOut();
     }
 
