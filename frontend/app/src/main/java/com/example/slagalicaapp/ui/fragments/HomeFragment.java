@@ -16,6 +16,7 @@ import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.firebase.MatchmakingManager;
 import com.example.slagalicaapp.databinding.FragmentHomeBinding;
 import com.example.slagalicaapp.ui.activities.GameActivity;
+import com.example.slagalicaapp.ui.fragments.FriendsFragment;
 import com.example.slagalicaapp.viewmodels.AuthViewModel;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -92,6 +93,12 @@ public class HomeFragment extends Fragment {
         binding.btnNotifications.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new NotificationsFragment())
+                        .addToBackStack(null)
+                        .commit());
+
+        binding.btnFriends.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new FriendsFragment())
                         .addToBackStack(null)
                         .commit());
 

@@ -179,7 +179,6 @@ public class RegionRepository {
 
     public LiveData<List<PlayerLeaderboardEntry>> getRegionPlayerLeaderboard(String region) {
         MutableLiveData<List<PlayerLeaderboardEntry>> result = new MutableLiveData<>();
-        String currentMonth = getCurrentMonth();
         FirebaseUser user = mAuth.getCurrentUser();
         String currentUid = user != null ? user.getUid() : "";
 
@@ -190,12 +189,8 @@ public class RegionRepository {
                         String username = doc.getString("username");
                         if (username == null) continue;
 
-                        int stars = 0;
-                        String cycleMonth = doc.getString("cycleMonth");
-                        if (currentMonth.equals(cycleMonth)) {
-                            Long ms = doc.getLong("monthlyStars");
-                            stars = ms != null ? ms.intValue() : 0;
-                        }
+                        Long ts = doc.getLong("totalStars");
+                        int stars = ts != null ? ts.intValue() : 0;
 
                         boolean isCurrentUser = doc.getId().equals(currentUid);
                         entries.add(new PlayerLeaderboardEntry(username, stars, isCurrentUser));
@@ -213,19 +208,21 @@ public class RegionRepository {
 
     public LiveData<List<PlayerMapDot>> getPlayerDots() {
         MutableLiveData<List<PlayerMapDot>> result = new MutableLiveData<>();
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null) { result.setValue(new ArrayList<>()); return result; }
 
-        db.collection("users").get().addOnSuccessListener(snapshots -> {
-            List<PlayerMapDot> dots = new ArrayList<>();
-            for (QueryDocumentSnapshot doc : snapshots) {
-                String region = doc.getString("region");
-                Double mapX = doc.getDouble("mapX");
-                Double mapY = doc.getDouble("mapY");
-                if (region != null && mapX != null && mapY != null) {
-                    dots.add(new PlayerMapDot(mapX.floatValue(), mapY.floatValue(), region));
-                }
-            }
-            result.setValue(dots);
-        }).addOnFailureListener(e -> result.setValue(new ArrayList<>()));
+        db.collection("users").document(user.getUid()).get()
+                .addOnSuccessListener(doc -> {
+                    List<PlayerMapDot> dots = new ArrayList<>();
+                    String region = doc.getString("region");
+                    Double mapX   = doc.getDouble("mapX");
+                    Double mapY   = doc.getDouble("mapY");
+                    if (region != null && mapX != null && mapY != null) {
+                        dots.add(new PlayerMapDot(mapX.floatValue(), mapY.floatValue(), region));
+                    }
+                    result.setValue(dots);
+                })
+                .addOnFailureListener(e -> result.setValue(new ArrayList<>()));
 
         return result;
     }
