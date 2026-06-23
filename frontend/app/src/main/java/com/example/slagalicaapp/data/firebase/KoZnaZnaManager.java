@@ -2,6 +2,7 @@ package com.example.slagalicaapp.data.firebase;
 
 import androidx.annotation.NonNull;
 import com.example.slagalicaapp.model.Question;
+import com.example.slagalicaapp.ui.activities.GameActivity;
 import com.google.firebase.database.*;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,7 +14,8 @@ public class KoZnaZnaManager {
     public interface KoZnaZnaListener {
         void onGameReady(List<Question> questions, String p1Name, String p2Name);
         void onQuestionStarted(int index, long startedAt);
-        void onAnswerSubmitted(int playerNum, int answerIndex);
+        // PROMENJENO: listener sada prosleđuje i timestamp kada je igrač stvarno kliknuo
+        void onAnswerSubmitted(int playerNum, int answerIndex, long clientClickTime);
         void onQuestionFinished(int index, int p1Answer, int p2Answer,
                                 int correctAnswer, int p1Score, int p2Score);
         void onGameFinished(int p1Score, int p2Score, String forfeitBy);
@@ -29,11 +31,12 @@ public class KoZnaZnaManager {
     private boolean gameReadyFired = false;
     private int lastQuestionIndex = -1;
     private String lastQuestionStatus = "";
-    private int lastAnswerBitmask = 0; // bit 0 = P1 answered, bit 1 = P2 answered
+    private int lastAnswerBitmask = 0;
 
     public KoZnaZnaManager(String roomId, int myPlayerNumber, KoZnaZnaListener listener) {
+        // KOREKCIJA: Usmereno na krovni čvor meča GAME_MECH ("SLAGALICA_MECH")
         this.roomRef = FirebaseDatabase.getInstance().getReference()
-                .child("rooms").child("KO_ZNA_ZNA").child(roomId);
+                .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
         this.myPlayerNumber = myPlayerNumber;
         this.listener = listener;
     }
@@ -42,7 +45,7 @@ public class KoZnaZnaManager {
         roomListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (isGameOver) return;
+                if (isGameOver || !snapshot.exists()) return;
 
                 String status = snapshot.child("status").getValue(String.class);
                 if (status == null) return;
@@ -53,17 +56,16 @@ public class KoZnaZnaManager {
                     String p2 = snapshot.child("player2").getValue(String.class);
                     listener.onGameReady(
                             readQuestions(snapshot),
-                            p1 != null ? p1 : "Igrac 1",
-                            p2 != null ? p2 : "Igrac 2");
+                            p1 != null ? p1 : "Igrač 1",
+                            p2 != null ? p2 : "Igrač 2");
                 }
 
-                if ("game_finished".equals(status)) {
+                if ("game_finished".equals(status) || "forfeit".equals(status)) {
                     isGameOver = true;
                     stopListening();
                     int p1 = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
                     int p2 = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
-                    listener.onGameFinished(p1, p2,
-                            snapshot.child("forfeitBy").getValue(String.class));
+                    listener.onGameFinished(p1, p2, snapshot.child("forfeitBy").getValue(String.class));
                     return;
                 }
 
@@ -72,7 +74,6 @@ public class KoZnaZnaManager {
                 if (qIdxLong == null || qStatus == null) return;
                 int qIdx = qIdxLong.intValue();
 
-                // New question started
                 if (qIdx != lastQuestionIndex && "playing".equals(qStatus)) {
                     lastQuestionIndex = qIdx;
                     lastQuestionStatus = qStatus;
@@ -81,30 +82,38 @@ public class KoZnaZnaManager {
                     listener.onQuestionStarted(qIdx, startedAt != null ? startedAt : System.currentTimeMillis());
                 }
 
-                // Check for new answers
+                // Čitanje odgovora i njihovih timestamp-ova sa klijenta
                 DataSnapshot ansSnap = snapshot.child("answers").child(String.valueOf(qIdx));
-                Long p1AnsL = ansSnap.child("player1").getValue(Long.class);
-                Long p2AnsL = ansSnap.child("player2").getValue(Long.class);
-                if (p1AnsL != null && (lastAnswerBitmask & 1) == 0) {
+                DataSnapshot p1Snap = ansSnap.child("player1");
+                DataSnapshot p2Snap = ansSnap.child("player2");
+
+                if (p1Snap.exists() && (lastAnswerBitmask & 1) == 0) {
                     lastAnswerBitmask |= 1;
-                    listener.onAnswerSubmitted(1, p1AnsL.intValue());
+                    Long ans = p1Snap.child("index").getValue(Long.class);
+                    Long time = p1Snap.child("clickTime").getValue(Long.class);
+                    listener.onAnswerSubmitted(1, ans != null ? ans.intValue() : -1, time != null ? time : 0L);
                 }
-                if (p2AnsL != null && (lastAnswerBitmask & 2) == 0) {
+                if (p2Snap.exists() && (lastAnswerBitmask & 2) == 0) {
                     lastAnswerBitmask |= 2;
-                    listener.onAnswerSubmitted(2, p2AnsL.intValue());
+                    Long ans = p2Snap.child("index").getValue(Long.class);
+                    Long time = p2Snap.child("clickTime").getValue(Long.class);
+                    listener.onAnswerSubmitted(2, ans != null ? ans.intValue() : -1, time != null ? time : 0L);
                 }
 
-                // Question result phase
                 if ("result".equals(qStatus) && !"result".equals(lastQuestionStatus)) {
                     lastQuestionStatus = qStatus;
                     Long correctL = snapshot.child("questions").child(String.valueOf(qIdx))
                             .child("correctAnswerIndex").getValue(Long.class);
                     int p1Score = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
                     int p2Score = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
+
+                    Long p1AnsVal = p1Snap.child("index").getValue(Long.class);
+                    Long p2AnsVal = p2Snap.child("index").getValue(Long.class);
+
                     listener.onQuestionFinished(
                             qIdx,
-                            p1AnsL != null ? p1AnsL.intValue() : -1,
-                            p2AnsL != null ? p2AnsL.intValue() : -1,
+                            p1AnsVal != null ? p1AnsVal.intValue() : -1,
+                            p2AnsVal != null ? p2AnsVal.intValue() : -1,
                             correctL != null ? correctL.intValue() : 0,
                             p1Score, p2Score);
                 }
@@ -118,26 +127,27 @@ public class KoZnaZnaManager {
         roomRef.addValueEventListener(roomListener);
     }
 
-    public void submitAnswer(int questionIndex, int answerIndex) {
+    // PROMENJENO: Čuva strukturu objekta sa indeksima i vremenom klika
+    public void submitAnswer(int questionIndex, int answerIndex, long clickTime) {
         if (isGameOver) return;
+        Map<String, Object> ansMap = new HashMap<>();
+        ansMap.put("index", answerIndex);
+        ansMap.put("clickTime", clickTime);
         roomRef.child("answers").child(String.valueOf(questionIndex))
-                .child("player" + myPlayerNumber).setValue(answerIndex);
+                .child("player" + myPlayerNumber).setValue(ansMap);
     }
 
-    /** P1 only: write both answers, new scores, set questionStatus = "result". */
-    public void publishQuestionResult(int questionIndex, int p1Answer, int p2Answer,
-                                       int p1Score, int p2Score) {
+    public void publishQuestionResult(int questionIndex, int p1Answer, int p2Answer, int p1Score, int p2Score) {
         if (isGameOver) return;
         Map<String, Object> upd = new HashMap<>();
-        upd.put("answers/" + questionIndex + "/player1", p1Answer);
-        upd.put("answers/" + questionIndex + "/player2", p2Answer);
+        upd.put("answers/" + questionIndex + "/player1/index", p1Answer);
+        upd.put("answers/" + questionIndex + "/player2/index", p2Answer);
         upd.put("scores/player1", p1Score);
         upd.put("scores/player2", p2Score);
         upd.put("questionStatus", "result");
         roomRef.updateChildren(upd);
     }
 
-    /** P1 only: advance to next question. */
     public void advanceToNextQuestion(int nextIndex, long startedAt) {
         if (isGameOver) return;
         Map<String, Object> upd = new HashMap<>();
@@ -147,7 +157,6 @@ public class KoZnaZnaManager {
         roomRef.updateChildren(upd);
     }
 
-    /** P1 only: mark game as finished. */
     public void finishGame(int p1Score, int p2Score) {
         if (isGameOver) return;
         String winner = p1Score > p2Score ? "player1" : p2Score > p1Score ? "player2" : "draw";

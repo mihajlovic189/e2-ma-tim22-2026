@@ -1,6 +1,7 @@
 package com.example.slagalicaapp.data.firebase;
 
 import androidx.annotation.NonNull;
+import com.example.slagalicaapp.ui.activities.GameActivity;
 import com.google.firebase.database.*;
 
 import java.util.*;
@@ -8,23 +9,8 @@ import java.util.*;
 public class AsocijacijeManager {
 
     public interface AsocijacijeListener {
-        /** Fires once when status becomes "playing". Includes static board data. */
-        void onGameReady(String p1Name, String p2Name,
-                         String[][] fields,
-                         String[] columnSolutions,
-                         String finalSolution,
-                         long gameEndsAt);
-
-        /** Fires on every meaningful board-state change. */
-        void onStateChanged(int activePlayer,
-                            String turnPhase,
-                            long turnEndsAt,
-                            Set<String> openedFields,
-                            Map<String, Integer> columnsSolvedBy,
-                            int finalSolvedBy,
-                            int finalGuessAttempts,
-                            int p1Score, int p2Score);
-
+        void onGameReady(String p1Name, String p2Name, String[][] fields, String[] columnSolutions, String finalSolution, long gameEndsAt);
+        void onStateChanged(int activePlayer, String turnPhase, long turnEndsAt, Set<String> openedFields, Map<String, Integer> columnsSolvedBy, int finalSolvedBy, int finalGuessAttempts, int p1Score, int p2Score);
         void onGameFinished(int p1Score, int p2Score, String forfeitBy);
         void onError(String message);
     }
@@ -36,8 +22,9 @@ public class AsocijacijeManager {
     private boolean gameReadyFired = false;
 
     public AsocijacijeManager(String roomId, AsocijacijeListener listener) {
+        // KOREKCIJA: Prilagođeno krovnom čvoru sesije meča
         this.roomRef = FirebaseDatabase.getInstance().getReference()
-                .child("rooms").child("ASOCIJACIJE").child(roomId);
+                .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
         this.listener = listener;
     }
 
@@ -45,7 +32,7 @@ public class AsocijacijeManager {
         roomListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (isGameOver) return;
+                if (isGameOver || !snapshot.exists()) return;
                 String status = snapshot.child("status").getValue(String.class);
                 if (status == null) return;
 
@@ -54,14 +41,12 @@ public class AsocijacijeManager {
                     stopListening();
                     int p1 = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
                     int p2 = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
-                    listener.onGameFinished(p1, p2,
-                            snapshot.child("forfeitBy").getValue(String.class));
+                    listener.onGameFinished(p1, p2, snapshot.child("forfeitBy").getValue(String.class));
                     return;
                 }
 
                 if (!"playing".equals(status)) return;
 
-                // Parse board data on first snapshot
                 if (!gameReadyFired) {
                     gameReadyFired = true;
                     String[][] fields = parseFields(snapshot);
@@ -78,7 +63,6 @@ public class AsocijacijeManager {
                             geAt != null ? geAt : System.currentTimeMillis() + 120_000L);
                 }
 
-                // Current dynamic state
                 Long apL = snapshot.child("activePlayer").getValue(Long.class);
                 int activePlayer = apL != null ? apL.intValue() : 1;
 
@@ -124,6 +108,153 @@ public class AsocijacijeManager {
         roomRef.updateChildren(updates);
     }
 
+    // KOREKCIJA: Atomska transakcija za obradu pogađanja kolone prema zvaničnim pravilima Slagalice
+    public void submitColumnGuessAtomic(int playerNum, String colLetter, String guess, String correctSolution, long guessDurationMs) {
+        if (isGameOver) return;
+        roomRef.runTransaction(new Transaction.Handler() {
+            @NonNull
+            @Override
+            public Transaction.Result doTransaction(@NonNull MutableData data) {
+                // Umesto .exists() koristimo proveru na null vrednost
+                if (data.child("columnsSolved").child(colLetter).getValue() != null) {
+                    return Transaction.abort(); // Već rešeno
+                }
+
+                boolean isCorrect = guess.trim().equalsIgnoreCase(correctSolution.trim());
+                long now = System.currentTimeMillis();
+
+                if (isCorrect) {
+                    // Računanje neotvorenih polja u toj koloni
+                    int unopenCount = 4;
+                    for (int i = 1; i <= 4; i++) {
+                        if (data.child("openedFields").child(colLetter + i).getValue() != null) {
+                            unopenCount--;
+                        }
+                    }
+                    // Formula: 2 boda + 1 bod za svako neotvoreno polje
+                    int points = 2 + unopenCount;
+
+                    data.child("columnsSolved").child(colLetter).setValue(playerNum);
+
+                    Long currentScore = data.child("scores/player" + playerNum).getValue(Long.class);
+                    data.child("scores/player" + playerNum).setValue((currentScore != null ? currentScore : 0) + points);
+
+                    data.child("turnPhase").setValue("guessing");
+                    data.child("turnEndsAt").setValue(now + guessDurationMs);
+                } else {
+                    int nextPlayer = 3 - playerNum;
+                    data.child("activePlayer").setValue(nextPlayer);
+
+                    boolean allOpen = checkAllFieldsOpen(data);
+                    if (allOpen || data.child("columnsSolved").getChildrenCount() >= 4) {
+                        data.child("turnPhase").setValue("guessing");
+                        data.child("turnEndsAt").setValue(now + guessDurationMs);
+                    } else {
+                        data.child("turnPhase").setValue("opening");
+                        data.child("turnEndsAt").setValue(0L);
+                    }
+                }
+                return Transaction.success(data);
+            }
+
+            @Override
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {}
+        });
+    }
+
+    // KOREKCIJA: Atomska transakcija za obradu konačnog rešenja sa kaskadnim bodovanjem neotvorenih kolona
+    public void submitFinalGuessAtomic(int playerNum, String guess, String correctSolution, long guessDurationMs) {
+        if (isGameOver) return;
+        roomRef.runTransaction(new Transaction.Handler() {
+            @NonNull
+            @Override
+            public Transaction.Result doTransaction(@NonNull MutableData data) {
+                if (data.child("finalSolvedBy").getValue(Long.class) != null &&
+                        data.child("finalSolvedBy").getValue(Long.class) > 0) {
+                    return Transaction.abort();
+                }
+
+                boolean isCorrect = guess.trim().equalsIgnoreCase(correctSolution.trim());
+                long now = System.currentTimeMillis();
+
+                if (isCorrect) {
+                    int finalPoints = 7;
+
+                    String[] cols = {"A", "B", "C", "D"};
+                    for (String col : cols) {
+                        if (data.child("columnsSolved").child(col).getValue() == null) {
+                            // Kolona nije rešena pre konačnog
+                            finalPoints += 6;
+
+                            int unopenInCol = 4;
+                            for (int i = 1; i <= 4; i++) {
+                                if (data.child("openedFields").child(col + i).getValue() != null) {
+                                    unopenInCol--;
+                                }
+                            }
+                            finalPoints += (2 + unopenInCol);
+                            data.child("columnsSolved").child(col).setValue(playerNum);
+                        }
+                    }
+
+                    data.child("finalSolvedBy").setValue(playerNum);
+                    Long currentScore = data.child("scores/player" + playerNum).getValue(Long.class);
+                    int totalNewScore = (currentScore != null ? currentScore.intValue() : 0) + finalPoints;
+                    data.child("scores/player" + playerNum).setValue(totalNewScore);
+
+                    int p1 = 0, p2 = 0;
+                    if (playerNum == 1) {
+                        p1 = totalNewScore;
+                        Long p2L = data.child("scores/player2").getValue(Long.class);
+                        p2 = p2L != null ? p2L.intValue() : 0;
+                    } else {
+                        p2 = totalNewScore;
+                        Long p1L = data.child("scores/player1").getValue(Long.class);
+                        p1 = p1L != null ? p1L.intValue() : 0;
+                    }
+
+                    String winner = p1 > p2 ? "player1" : (p2 > p1 ? "player2" : "draw");
+                    data.child("winner").setValue(winner);
+                    data.child("status").setValue("game_finished");
+                    data.child("finishedAt").setValue(now);
+
+                } else {
+                    int nextPlayer = 3 - playerNum;
+                    data.child("activePlayer").setValue(nextPlayer);
+
+                    boolean allOpen = checkAllFieldsOpen(data);
+                    if (allOpen || data.child("columnsSolved").getChildrenCount() >= 4) {
+                        data.child("turnPhase").setValue("guessing");
+                        data.child("turnEndsAt").setValue(now + guessDurationMs);
+                    } else {
+                        data.child("turnPhase").setValue("opening");
+                        data.child("turnEndsAt").setValue(0L);
+                    }
+                }
+                return Transaction.success(data);
+            }
+
+            @Override
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {}
+        });
+    }
+
+    private boolean checkAllFieldsOpen(MutableData data) {
+        Set<String> totalRevealed = new HashSet<>();
+        for (MutableData f : data.child("openedFields").getChildren()) {
+            totalRevealed.add(f.getKey());
+        }
+        String[] cols = {"A", "B", "C", "D"};
+        for (String colLetter : cols) {
+            if (data.child("columnsSolved").child(colLetter).getValue() != null) {
+                for (int i = 1; i <= 4; i++) {
+                    totalRevealed.add(colLetter + i);
+                }
+            }
+        }
+        return totalRevealed.size() >= 16;
+    }
+
     public void stopListening() {
         if (roomListener != null) {
             roomRef.removeEventListener(roomListener);
@@ -131,9 +262,6 @@ public class AsocijacijeManager {
         }
     }
 
-    // ─── Parsing helpers ────────────────────────────────────────────────────
-
-    /** Returns fields[col][row], col=A..D (0..3), row=1..4 (0..3). */
     private String[][] parseFields(DataSnapshot snapshot) {
         String[][] f = new String[4][4];
         for (int c = 0; c < 4; c++) {

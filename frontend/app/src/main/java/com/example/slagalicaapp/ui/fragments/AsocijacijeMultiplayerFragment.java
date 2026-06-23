@@ -321,99 +321,40 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
 
     private void handleColumnGuess(int col, String attempt) {
         if (!iAmActive || isGameOver || inputFrozen) return;
-        if (!"guessing".equals(currentTurnPhase)) return; // only allowed after opening a field
+        if (!"guessing".equals(currentTurnPhase)) return;
         if (TextUtils.isEmpty(attempt)) return;
-        if (columnsSolvedBy.containsKey(colLetter(col))) return;
+
+        String colLetter = colLetter(col);
+        if (columnsSolvedBy.containsKey(colLetter)) return;
 
         freezeInput();
-        AsocijacijeBoard b   = reconstructBoard();
-        AsocijacijeGuessResult res = b.guessColumn(col, attempt);
+        getEditTextForColumn(col).setText("");
 
-        Map<String, Object> upd = new HashMap<>();
-        if (res.isCorrect()) {
-            int gained     = res.getPointsAwarded();
-            int newMyScore = myScore() + gained;
-            upd.put("columnsSolved/" + colLetter(col), myPlayerNumber);
-            upd.put("scores/player" + myPlayerNumber, newMyScore);
-            // Stay in guessing phase with a fresh 20s
-            upd.put("turnPhase",  "guessing");
-            upd.put("turnEndsAt", System.currentTimeMillis() + GUESS_DURATION_MS);
-            showToast("Tačno! +" + gained + " bodova");
-        } else {
-            upd.put("activePlayer", 3 - myPlayerNumber);
-            boolean allFieldsAreOpen = areAllFieldsOpen();
-            if (allFieldsAreOpen || columnsSolvedBy.size() >= 4) {
-                upd.put("turnPhase",   "guessing");
-                upd.put("turnEndsAt",  System.currentTimeMillis() + GUESS_DURATION_MS);
-            } else {
-                upd.put("turnPhase",   "opening");
-                upd.put("turnEndsAt",  0L);
-            }
-            getEditTextForColumn(col).setText("");
-            showToast("Netačno");
-        }
-        manager.commitAction(upd);
+        manager.submitColumnGuessAtomic(myPlayerNumber, colLetter, attempt, columnSolutions[col], GUESS_DURATION_MS);
     }
 
     // ─── Final guess ─────────────────────────────────────────────────────────
 
     private void handleFinalGuess(String attempt) {
         if (!iAmActive || isGameOver || inputFrozen) return;
-        if (!"guessing".equals(currentTurnPhase)) return; // only allowed after opening a field
+        if (!"guessing".equals(currentTurnPhase)) return;
         if (TextUtils.isEmpty(attempt)) return;
         if (finalSolvedBy > 0) return;
 
         freezeInput();
-        AsocijacijeBoard b   = reconstructBoard();
-        AsocijacijeGuessResult res = b.guessFinal(attempt);
+        binding.etFinalSolution.setText(""); // odmah očisti lokalni unos
 
-        Map<String, Object> upd = new HashMap<>();
-        if (res.isCorrect()) {
-            int gained     = res.getPointsAwarded();
-            int newMyScore = myScore() + gained;
-            int newP1      = (myPlayerNumber == 1) ? newMyScore : p1Score;
-            int newP2      = (myPlayerNumber == 2) ? newMyScore : p2Score;
-            String winner  = newP1 > newP2 ? "player1" : newP2 > newP1 ? "player2" : "draw";
-            upd.put("finalSolvedBy",                   myPlayerNumber);
-            upd.put("scores/player" + myPlayerNumber,  newMyScore);
-            upd.put("status",     "game_finished");
-            upd.put("winner",     winner);
-            upd.put("finishedAt", System.currentTimeMillis());
-            showToast("POBEDA! +" + gained + " bodova");
-        } else {
-            upd.put("activePlayer", 3 - myPlayerNumber);
-            boolean allFieldsAreOpen = areAllFieldsOpen();
-            if (allFieldsAreOpen || columnsSolvedBy.size() >= 4) {
-                upd.put("turnPhase",   "guessing");
-                upd.put("turnEndsAt",  System.currentTimeMillis() + GUESS_DURATION_MS);
-            } else {
-                upd.put("turnPhase",   "opening");
-                upd.put("turnEndsAt",  0L);
-            }
-            binding.etFinalSolution.setText("");
-            showToast("Netačno konačno rešenje");
-        }
-        manager.commitAction(upd);
+        // Šaljemo na atomsku proveru i kaskadno bodovanje
+        manager.submitFinalGuessAtomic(myPlayerNumber, attempt, finalSolution, GUESS_DURATION_MS);
     }
 
     // ─── Board reconstruction for local evaluation ───────────────────────────
 
     private boolean areAllFieldsOpen() {
-        int openCount = openedFieldKeys.size();
-        for (Integer solvedByPlayer : columnsSolvedBy.values()) {
-            // This is tricky because we don't know which fields were open before column solve.
-            // A simple approximation is to assume a solved column adds unopened fields.
-            // Let's count solved columns and add 4 for each. This is imperfect.
-            // A better check is just the number of solved columns.
-        }
-        // A column is fully revealed when solved.
-        int revealedInSolvedColumns = columnsSolvedBy.size() * 4;
-        // However, some fields might have been open already.
-        // The most reliable check is to count open fields AND fields in solved columns.
         Set<String> totalRevealed = new HashSet<>(openedFieldKeys);
         for (String colLetter : columnsSolvedBy.keySet()) {
-            for (int i = 0; i < 4; i++) {
-                totalRevealed.add(colLetter + (i + 1));
+            for (int i = 1; i <= 4; i++) {
+                totalRevealed.add(colLetter + i);
             }
         }
         return totalRevealed.size() >= 16;

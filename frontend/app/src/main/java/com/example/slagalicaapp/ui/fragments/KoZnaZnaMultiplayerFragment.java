@@ -156,15 +156,16 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
     }
 
     @Override
-    public void onAnswerSubmitted(int playerNum, int answerIndex) {
+    public void onAnswerSubmitted(int playerNum, int answerIndex, long clientClickTime) {
         requireActivity().runOnUiThread(() -> {
-            long now = System.currentTimeMillis();
             if (playerNum == 1) {
-                p1TrackedAnswer = answerIndex; p1Answered = true;
-                if (p1AnswerTime == 0) p1AnswerTime = now; // don't override time set by local click
+                p1TrackedAnswer = answerIndex;
+                p1Answered = true;
+                p1AnswerTime = clientClickTime;
             } else {
-                p2TrackedAnswer = answerIndex; p2Answered = true;
-                if (p2AnswerTime == 0) p2AnswerTime = now;
+                p2TrackedAnswer = answerIndex;
+                p2Answered = true;
+                p2AnswerTime = clientClickTime;
             }
 
             if (isCoordinator && p1Answered && p2Answered) {
@@ -251,14 +252,21 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         setAnswersEnabled(false);
         myLocalAnswer = answerIndex;
         answerButtons[answerIndex].setBackgroundTintList(
-                ColorStateList.valueOf(Color.parseColor("#3B82F6"))); // blue — "submitted"
+                ColorStateList.valueOf(Color.parseColor("#3B82F6")));
 
-        // Record click time before Firebase round-trip
-        long now = System.currentTimeMillis();
-        if (myPlayerNumber == 1) { p1AnswerTime = now; p1TrackedAnswer = answerIndex; p1Answered = true; }
-        else                     { p2AnswerTime = now; p2TrackedAnswer = answerIndex; p2Answered = true; }
+        long kliknutoU = System.currentTimeMillis();
+        if (myPlayerNumber == 1) {
+            p1AnswerTime = kliknutoU;
+            p1TrackedAnswer = answerIndex;
+            p1Answered = true;
+        } else {
+            p2AnswerTime = kliknutoU;
+            p2TrackedAnswer = answerIndex;
+            p2Answered = true;
+        }
 
-        manager.submitAnswer(currentQuestionIndex, answerIndex);
+        // Prosleđujemo i vreme klika
+        manager.submitAnswer(currentQuestionIndex, answerIndex, kliknutoU);
 
         if (isCoordinator && p1Answered && p2Answered) {
             evaluateAndPublish();
@@ -281,11 +289,9 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         boolean p1Correct = p1Answered && (p1TrackedAnswer == correct);
         boolean p2Correct = p2Answered && (p2TrackedAnswer == correct);
 
-        // Only the FIRST correct answerer gets POINTS_CORRECT; wrong answers always lose POINTS_INCORRECT
         if (p1Correct && p2Correct) {
-            boolean p1First = (p1AnswerTime > 0 && p2AnswerTime > 0)
-                    ? p1AnswerTime <= p2AnswerTime
-                    : (p1AnswerTime > 0); // if only one time is known, they answered first
+            // Savršeno pošteno poređenje mrežnih timestamp-ova
+            boolean p1First = (p1AnswerTime <= p2AnswerTime);
             if (p1First) newP1Score += POINTS_CORRECT;
             else         newP2Score += POINTS_CORRECT;
         } else if (p1Correct) {
@@ -293,6 +299,7 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         } else if (p2Correct) {
             newP2Score += POINTS_CORRECT;
         }
+
         if (p1Answered && !p1Correct) newP1Score += POINTS_INCORRECT;
         if (p2Answered && !p2Correct) newP2Score += POINTS_INCORRECT;
 

@@ -236,10 +236,11 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     private void loadPlayerNamesAndScores() {
         com.google.firebase.database.DatabaseReference roomRef =
                 com.google.firebase.database.FirebaseDatabase.getInstance().getReference()
-                        .child("rooms").child("MOJ_BROJ").child(roomId);
+                        .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
         roomRef.addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
             @Override
             public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
+                if (!isAdded() || !snapshot.exists()) return;
                 String p1 = snapshot.child("player1").getValue(String.class);
                 String p2 = snapshot.child("player2").getValue(String.class);
                 Long s1 = snapshot.child("scores").child("player1").getValue(Long.class);

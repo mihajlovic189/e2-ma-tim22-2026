@@ -1,6 +1,7 @@
 package com.example.slagalicaapp.data.firebase;
 
 import androidx.annotation.NonNull;
+import com.example.slagalicaapp.ui.activities.GameActivity;
 import com.google.firebase.database.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,8 +27,9 @@ public class SkockoManager {
     private int lastRound2Count = 0;
 
     public SkockoManager(String roomId, SkockoListener listener) {
+        // KOREKCIJA: Prilagođeno krovnom čvoru sesije meča
         this.roomRef = FirebaseDatabase.getInstance().getReference()
-                .child("rooms").child("SKOCKO").child(roomId);
+                .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
         this.listener = listener;
     }
 
@@ -35,7 +37,7 @@ public class SkockoManager {
         roomListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (isGameOver) return;
+                if (isGameOver || !snapshot.exists()) return;
 
                 String status = snapshot.child("status").getValue(String.class);
                 if (status == null) return;
@@ -49,8 +51,8 @@ public class SkockoManager {
                     int ps1 = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
                     int ps2 = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
                     listener.onRoomReady(
-                            p1 != null ? p1 : "Igrac 1",
-                            p2 != null ? p2 : "Igrac 2",
+                            p1 != null ? p1 : "Igrač 1",
+                            p2 != null ? p2 : "Igrač 2",
                             s1 != null ? s1 : "",
                             s2 != null ? s2 : "",
                             ps1, ps2);
@@ -90,8 +92,7 @@ public class SkockoManager {
         int lastCount = "round1".equals(roundKey) ? lastRound1Count : lastRound2Count;
         DataSnapshot roundSnap = snapshot.child(roundKey);
 
-        int count = 0;
-        for (DataSnapshot ignored : roundSnap.getChildren()) count++;
+        int count = (int) roundSnap.getChildrenCount();
 
         if ("round1".equals(roundKey)) lastRound1Count = count;
         else lastRound2Count = count;
@@ -110,9 +111,8 @@ public class SkockoManager {
         }
     }
 
-    /** Atomically writes a guess and any accompanying phase transition. */
     public void writeGuessAndAdvance(String roundKey, int guessIndex, int[] symbols,
-                                      int reds, int yellows, Map<String, Object> extra) {
+                                     int reds, int yellows, Map<String, Object> extra) {
         if (isGameOver) return;
         Map<String, Object> update = new HashMap<>(extra);
         update.put(roundKey + "/" + guessIndex + "/symbols", encodeSymbols(symbols));
@@ -121,10 +121,42 @@ public class SkockoManager {
         roomRef.updateChildren(update);
     }
 
-    /** Advances phase without a guess (called by active player on timer expiry). */
-    public void advancePhase(Map<String, Object> phaseUpdate) {
+    // KOREKCIJA: Koristimo transakciju za prelazak faza na tajmaut da sprečimo dupliranje/trkanje niti
+    public void advancePhaseAtomic(String expectedPhase, String nextPhase, long nextEndsAt, int currentP1, int currentP2) {
         if (isGameOver) return;
-        roomRef.updateChildren(phaseUpdate);
+        roomRef.runTransaction(new Transaction.Handler() {
+            @NonNull
+            @Override
+            public Transaction.Result doTransaction(@NonNull MutableData data) {
+                String currentPhaseInDb = data.child("phase").getValue(String.class);
+                if (currentPhaseInDb == null || !currentPhaseInDb.equals(expectedPhase)) {
+                    return Transaction.abort(); // Neko je već promenio fazu
+                }
+
+                data.child("phase").setValue(nextPhase);
+                data.child("phaseEndsAt").setValue(nextEndsAt);
+                data.child("scores/player1").setValue(currentP1);
+                data.child("scores/player2").setValue(currentP2);
+
+                if ("FINISHED".equals(nextPhase)) {
+                    int p1 = 0, p2 = 0;
+                    try {
+                        p1 = ((Long) data.child("scores/player1").getValue()).intValue();
+                        p2 = ((Long) data.child("scores/player2").getValue()).intValue();
+                    } catch (Exception ignored) {}
+
+                    String winner = p1 > p2 ? "player1" : (p2 > p1 ? "player2" : "draw");
+                    data.child("winner").setValue(winner);
+                    data.child("status").setValue("game_finished");
+                    data.child("finishedAt").setValue(System.currentTimeMillis());
+                }
+
+                return Transaction.success(data);
+            }
+
+            @Override
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot currentData) {}
+        });
     }
 
     public void stopListening() {

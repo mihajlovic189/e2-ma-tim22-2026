@@ -1,5 +1,6 @@
 package com.example.slagalicaapp.data.firebase;
 
+import com.example.slagalicaapp.ui.activities.GameActivity;
 import com.google.firebase.database.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -20,8 +21,9 @@ public class KorakPoKorakManager {
     private ValueEventListener roomListener;
 
     public KorakPoKorakManager(String roomId, int myPlayerNumber, KorakListener listener) {
+        // KOREKCIJA: Usmereno na krovni čvor meča GAME_MECH ("SLAGALICA_MECH")
         this.roomRef = FirebaseDatabase.getInstance().getReference()
-                .child("rooms").child("KORAK_PO_KORAK").child(roomId);
+                .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
         this.myPlayerNumber = myPlayerNumber;
         this.listener = listener;
     }
@@ -34,8 +36,18 @@ public class KorakPoKorakManager {
 
             @Override
             public void onDataChange(DataSnapshot snapshot) {
+                if (!snapshot.exists()) return;
+
                 String status = snapshot.child("status").getValue(String.class);
-                if (!"playing".equals(status)) return;
+                if ("forfeit".equals(status)) {
+                    Long s1 = snapshot.child("scores").child("player1").getValue(Long.class);
+                    Long s2 = snapshot.child("scores").child("player2").getValue(Long.class);
+                    int p1 = s1 != null ? s1.intValue() : 0;
+                    int p2 = s2 != null ? s2.intValue() : 0;
+                    String forfeitBy = snapshot.child("forfeitBy").getValue(String.class);
+                    listener.onGameFinished(p1, p2, forfeitBy, false);
+                    return;
+                }
 
                 int round = toInt(snapshot.child("currentRound").getValue(Long.class));
                 int activePlayer = toInt(snapshot.child("activePlayer").getValue(Long.class));
@@ -75,7 +87,7 @@ public class KorakPoKorakManager {
 
                 if ("round_finished".equals(roundStatus) && !lastRoundStatus.equals("round_finished")) {
                     lastRoundStatus = roundStatus;
-                    boolean hasNext = round < 2;
+                    boolean hasNext = round < 2; // Može se menjati u zavisnosti od broja željenih rundi
                     listener.onRoundFinished(p1, p2, hasNext, solved);
                 }
 
@@ -114,8 +126,7 @@ public class KorakPoKorakManager {
         });
     }
 
-    public void submitAnswer(String answer, int currentStep, boolean isOpponentChance,
-                             String correctAnswer) {
+    public void submitAnswer(String answer, int currentStep, boolean isOpponentChance, String correctAnswer) {
         boolean correct = answer.trim().equalsIgnoreCase(correctAnswer.trim());
 
         if (!correct) {
@@ -134,19 +145,9 @@ public class KorakPoKorakManager {
         solvedUpdate.put("lastSolvedBy", "player" + myPlayerNumber);
         roomRef.updateChildren(solvedUpdate);
 
-        int points;
-        if (!isOpponentChance) {
-            points = Math.max(0, 20 - (currentStep * 2));
-        } else {
-            points = 5;
-        }
-
-        String scorePath;
-        if (!isOpponentChance) {
-            scorePath = "player" + myPlayerNumber;
-        } else {
-            scorePath = "player" + myPlayerNumber;
-        }
+        // Računanje bodova: 20 - (korak * 2), ako je protivnikova šansa fiksno 5 bodova
+        int points = !isOpponentChance ? Math.max(0, 20 - (currentStep * 2)) : 5;
+        String scorePath = "player" + myPlayerNumber;
 
         final int finalPoints = points;
         final String finalScorePath = scorePath;
@@ -190,16 +191,6 @@ public class KorakPoKorakManager {
         }
     }
 
-    public void startNextRound(int nextActivePlayer) {
-        Map<String, Object> update = new HashMap<>();
-        update.put("currentRound", 2);
-        update.put("activePlayer", nextActivePlayer);
-        update.put("currentStep", 0);
-        update.put("roundStatus", "playing");
-        update.put("lastWrongAnswer", null);
-        roomRef.updateChildren(update);
-    }
-
     public void startNextRoundIfReady(int nextActivePlayer) {
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -209,8 +200,11 @@ public class KorakPoKorakManager {
                 if (roundVal == null || roundVal >= 2) return;
                 if (!"round_finished".equals(roundStatus)) return;
 
+                // KOREKCIJA: Dinamičko postavljanje sledeće runde na osnovu trenutne + 1
+                long sledecaRunda = roundVal + 1;
+
                 Map<String, Object> update = new HashMap<>();
-                update.put("currentRound", 2);
+                update.put("currentRound", sledecaRunda);
                 update.put("activePlayer", nextActivePlayer);
                 update.put("currentStep", 0);
                 update.put("roundStatus", "playing");

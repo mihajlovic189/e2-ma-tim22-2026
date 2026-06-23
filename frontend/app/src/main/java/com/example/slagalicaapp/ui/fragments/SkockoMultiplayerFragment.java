@@ -204,12 +204,14 @@ public class SkockoMultiplayerFragment extends Fragment {
 
         renderFeedbackForRow(row, reds, yellows);
 
-        // Advance cursor for input
-        currentRow = guessIndex + 2;
+        if (isStealPhase) {
+            currentRow = row;
+        } else {
+            currentRow = guessIndex + 2;
+        }
         currentCol = 1;
         btnConfirmRow.setVisibility(View.GONE);
 
-        // Re-enable input for active player (overridden by handlePhaseChange if phase changes)
         if (iAmActive && !isGameOver) {
             setSymbolButtonsEnabled(true);
         }
@@ -225,7 +227,6 @@ public class SkockoMultiplayerFragment extends Fragment {
             btn.setOnClickListener(v -> {
                 if (!iAmActive || isGameOver) return;
                 if (currentRow > MAX_ROWS) return;
-                if (isStealPhase && currentRow > 1) return;
                 if (currentCol > MAX_COLS) return;
 
                 ImageView cell = getCellView(currentRow, currentCol);
@@ -352,7 +353,6 @@ public class SkockoMultiplayerFragment extends Fragment {
 
     private void handleTimerExpired() {
         if (isGameOver) return;
-        Map<String, Object> upd = new HashMap<>();
         String nextPhase;
 
         switch (currentPhase) {
@@ -364,18 +364,7 @@ public class SkockoMultiplayerFragment extends Fragment {
         }
 
         long nextEndsAt = computeNextEndsAt(nextPhase);
-        upd.put("phase",       nextPhase);
-        upd.put("phaseEndsAt", nextEndsAt);
-        upd.put("scores/player1", p1Score);
-        upd.put("scores/player2", p2Score);
-
-        if ("FINISHED".equals(nextPhase)) {
-            upd.put("winner", winner());
-            upd.put("status", "game_finished");
-            upd.put("finishedAt", System.currentTimeMillis());
-        }
-
-        skockoManager.advancePhase(upd);
+        skockoManager.advancePhaseAtomic(currentPhase, nextPhase, nextEndsAt, p1Score, p2Score);
     }
 
     private long computeNextEndsAt(String phase) {
