@@ -13,6 +13,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
@@ -41,6 +42,8 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
 
     private static final int INVITE_NOTIF_ID = 9001;
+    private com.google.firebase.database.ChildEventListener backgroundChatListener;
+    private com.google.firebase.database.DatabaseReference backgroundChatRef;
 
     private static final Map<String, String> GAME_LABELS = new LinkedHashMap<>();
     static {
@@ -165,14 +168,28 @@ public class MainActivity extends AppCompatActivity {
         authStateListener = auth -> {
             FirebaseUser user = auth.getCurrentUser();
             if (user != null) {
+                String uid = user.getUid();
+
                 DatabaseReference ref = FirebaseDatabase.getInstance().getReference()
-                        .child("status").child(user.getUid());
+                        .child("status").child(uid);
                 ref.child("isOnline").setValue(true);
                 ref.child("isOnline").onDisconnect().setValue(false);
 
-                startGlobalInviteListener(user.getUid());
+                startGlobalInviteListener(uid);
 
-                // DODATO: Pokreni proveru tokena i ovde u slučaju da je korisnik uradio login kroz LoginFragment
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("users").document(uid)
+                        .get()
+                        .addOnSuccessListener(documentSnapshot -> {
+                            if (documentSnapshot != null && documentSnapshot.exists()) {
+                                String region = documentSnapshot.getString("region");
+                                if (region != null && !region.trim().isEmpty()) {
+
+                                    startBackgroundChatNotificationListener(uid, region);
+                                }
+                            }
+                        });
+
                 proveriIDodeliDnevneTokene();
             }
         };
@@ -184,6 +201,10 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
         if (authStateListener != null) {
             FirebaseAuth.getInstance().removeAuthStateListener(authStateListener);
+        }
+        if (backgroundChatListener != null && backgroundChatRef != null) {
+            backgroundChatRef.removeEventListener(backgroundChatListener);
+            backgroundChatListener = null;
         }
     }
 
@@ -415,6 +436,67 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             sendDemos();
+        }
+    }
+
+    private void startBackgroundChatNotificationListener(String myUid, String region) {
+        if (backgroundChatListener != null) return;
+
+        backgroundChatRef = FirebaseDatabase.getInstance().getReference()
+                .child("regional_chats").child(region);
+
+        backgroundChatListener = new com.google.firebase.database.ChildEventListener() {
+            @Override
+            public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+                Long timestamp = snapshot.child("timestamp").getValue(Long.class);
+                if (timestamp == null || (System.currentTimeMillis() - timestamp) > 10_000) {
+                    return;
+                }
+
+                String senderId = snapshot.child("senderId").getValue(String.class);
+                String senderName = snapshot.child("senderName").getValue(String.class);
+                String text = snapshot.child("text").getValue(String.class);
+
+                if (senderId != null && !senderId.equals(myUid) && !SlagalicaApp.isUserInChatScreen) {
+                    prikažiLokalnuChatNotifikaciju(senderName, text);
+                }
+            }
+
+            @Override public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
+            @Override public void onChildRemoved(@NonNull DataSnapshot snapshot) {}
+            @Override public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        };
+
+        backgroundChatRef.limitToLast(1).addChildEventListener(backgroundChatListener);
+    }
+
+    private void prikažiLokalnuChatNotifikaciju(String naslov, String poruka) {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent,
+                PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+
+        String channelId = "regional_chat_sim";
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.NotificationChannel channel = new android.app.NotificationChannel(
+                    channelId, "Regionalni Čet", NotificationManager.IMPORTANCE_DEFAULT);
+            if (notificationManager != null) notificationManager.createNotificationChannel(channel);
+        }
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("Nova poruka od: " + naslov)
+                .setContentText(poruka)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+        if (notificationManager != null) {
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
         }
     }
 
