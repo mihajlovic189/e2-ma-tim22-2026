@@ -179,9 +179,10 @@ public class FriendsFragment extends Fragment {
         FirebaseUser me = FirebaseAuth.getInstance().getCurrentUser();
         if (me == null) return;
 
-        String gameType = GameActivity.GAME_MECH;
+        String gameType      = GameActivity.GAME_MECH;
+        String myDisplayName = me.getDisplayName() != null ? me.getDisplayName() : "";
 
-        MatchmakingManager mm = new MatchmakingManager(gameType, "", me.getUid(),
+        MatchmakingManager mm = new MatchmakingManager(gameType, myDisplayName, me.getUid(),
                 new MatchmakingManager.MatchmakingListener() {
                     @Override public void onMatchFound(String roomId, int playerNumber) {}
                     @Override public void onWaiting() {}
@@ -196,7 +197,6 @@ public class FriendsFragment extends Fragment {
         sentRoomId   = roomId;
         sentGameType = gameType;
 
-        String myName = me.getDisplayName() != null ? me.getDisplayName() : "";
         vm.sendGameInvite(friend.getUid(), friend.getUsername(), gameType, roomId)
                 .observe(getViewLifecycleOwner(), inviteId -> {
                     if (inviteId == null) {
@@ -204,7 +204,7 @@ public class FriendsFragment extends Fragment {
                         return;
                     }
                     sentInviteId = inviteId;
-                    showInviteSentDialog(friend, gameType, inviteId, roomId, myName);
+                    showInviteSentDialog(friend, gameType, inviteId, roomId, myDisplayName);
                 });
     }
 
