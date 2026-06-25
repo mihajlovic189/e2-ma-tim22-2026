@@ -16,16 +16,18 @@ import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.firebase.MatchmakingManager;
 import com.example.slagalicaapp.databinding.FragmentHomeBinding;
 import com.example.slagalicaapp.ui.activities.GameActivity;
-import com.example.slagalicaapp.ui.fragments.FriendsFragment;
-import com.example.slagalicaapp.viewmodels.AuthViewModel;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.example.slagalicaapp.viewmodels.AuthViewModel;
 
 public class HomeFragment extends Fragment {
     private FragmentHomeBinding binding;
     private MatchmakingManager matchmaking;
     private String currentPlayerName;
     private String currentProfileUid;
+    private int currentTokens = 0;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -39,6 +41,7 @@ public class HomeFragment extends Fragment {
                 binding.headerStats.tvLeague.setText(profile.getLeagueName());
                 currentPlayerName = profile.getUsername();
                 currentProfileUid = profile.getUid();
+                currentTokens = profile.getTokenCount();
             }
         });
 
@@ -48,47 +51,10 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
-        binding.btnKorakPoKorak.setOnClickListener(v -> {
-            binding.btnKorakPoKorak.setEnabled(false);
-            Toast.makeText(getContext(), "Pokrecemo Korak po korak matchmaking...", Toast.LENGTH_SHORT).show();
-            startMatchmaking(GameActivity.GAME_KORAK);
+        binding.btnStartGame.setOnClickListener(v -> {
+            binding.btnStartGame.setEnabled(false);
+            startWholeGameMatchmaking();
         });
-
-        binding.btnMojBroj.setOnClickListener(v -> {
-            binding.btnMojBroj.setEnabled(false);
-            Toast.makeText(getContext(), "Pokrecemo Moj broj matchmaking...", Toast.LENGTH_SHORT).show();
-            startMatchmaking(GameActivity.GAME_MOJ_BROJ);
-        });
-
-        binding.btnAsocijacija.setOnClickListener(v -> {
-            binding.btnAsocijacija.setEnabled(false);
-            Toast.makeText(getContext(), "Pokrecemo Asocijacije matchmaking...", Toast.LENGTH_SHORT).show();
-            startMatchmaking(GameActivity.GAME_ASOCIJACIJE);
-        });
-
-        binding.btnSkocko.setOnClickListener(v -> {
-            binding.btnSkocko.setEnabled(false);
-            Toast.makeText(getContext(), "Pokrecemo Skocko matchmaking...", Toast.LENGTH_SHORT).show();
-            startMatchmaking(GameActivity.GAME_SKOCKO);
-        });
-
-        View koZnaZnaButton = binding.getRoot().findViewById(R.id.btnKoZnaZna);
-        if (koZnaZnaButton != null) {
-            koZnaZnaButton.setOnClickListener(v -> {
-                koZnaZnaButton.setEnabled(false);
-                Toast.makeText(getContext(), "Pokrecemo Ko Zna Zna matchmaking...", Toast.LENGTH_SHORT).show();
-                startMatchmaking(GameActivity.GAME_KO_ZNA_ZNA);
-            });
-        }
-
-        View spojniceButton = binding.getRoot().findViewById(R.id.btnSpojnice);
-        if (spojniceButton != null) {
-            spojniceButton.setOnClickListener(v -> {
-                spojniceButton.setEnabled(false);
-                Toast.makeText(getContext(), "Pokrecemo Spojnice matchmaking...", Toast.LENGTH_SHORT).show();
-                startMatchmaking(GameActivity.GAME_SPOJNICE);
-            });
-        }
 
         binding.btnNotifications.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
@@ -108,69 +74,90 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
+        binding.btnRegionalChat.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new RegionalChatFragment())
+                        .addToBackStack(null)
+                        .commit());
+
+        binding.btnRegionalChallenges.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new ChallengesFragment())
+                        .addToBackStack(null)
+                        .commit());
+
         return binding.getRoot();
     }
 
-    private void startMatchmaking(String gameType) {
+    private void startWholeGameMatchmaking() {
         String playerName = resolvePlayerName();
         if (TextUtils.isEmpty(playerName)) {
             Toast.makeText(getContext(), "Profil se još učitava, pokušaj ponovo", Toast.LENGTH_SHORT).show();
-            resetMatchmakingButton(gameType);
+            binding.btnStartGame.setEnabled(true);
+            return;
+        }
+
+        if (currentTokens < 1) {
+            Toast.makeText(getContext(), "Nemate dovoljno žetona! Svaki dan dobijate 5 novih.", Toast.LENGTH_LONG).show();
+            binding.btnStartGame.setEnabled(true);
             return;
         }
 
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        String playerUid = user != null ? user.getUid() : null;
-        final String finalPlayerName = playerName;
-        matchmaking = new MatchmakingManager(gameType, playerName, playerUid, new MatchmakingManager.MatchmakingListener() {
-            @Override
-            public void onMatchFound(String roomId, int playerNumber) {
-                requireActivity().runOnUiThread(() -> {
-                    Intent intent = new Intent(getActivity(), GameActivity.class);
-                    intent.putExtra(GameActivity.EXTRA_GAME_TYPE, gameType);
-                    intent.putExtra(GameActivity.EXTRA_ROOM_ID, roomId);
-                    intent.putExtra(GameActivity.EXTRA_PLAYER_NUM, playerNumber);
-                    intent.putExtra(GameActivity.EXTRA_PLAYER_NAME, finalPlayerName);
-                    startActivity(intent);
-                    resetMatchmakingButton(gameType);
-                });
-            }
-
-            @Override
-            public void onWaiting() {
-                requireActivity().runOnUiThread(() ->
-                        Toast.makeText(getContext(), "Tražim protivnika...", Toast.LENGTH_SHORT).show()
-                );
-            }
-
-            @Override
-            public void onError(String message) {
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(getContext(), "Greška: " + message, Toast.LENGTH_SHORT).show();
-                    resetMatchmakingButton(gameType);
-                });
-            }
-        });
-
-        matchmaking.findMatch();
-    }
-
-    private void resetMatchmakingButton(String gameType) {
-        if (GameActivity.GAME_KORAK.equals(gameType)) {
-            binding.btnKorakPoKorak.setEnabled(true);
-        } else if (GameActivity.GAME_MOJ_BROJ.equals(gameType)) {
-            binding.btnMojBroj.setEnabled(true);
-        } else if (GameActivity.GAME_SKOCKO.equals(gameType)) {
-            binding.btnSkocko.setEnabled(true);
-        } else if (GameActivity.GAME_KO_ZNA_ZNA.equals(gameType)) {
-            View btn = binding.getRoot().findViewById(R.id.btnKoZnaZna);
-            if (btn != null) btn.setEnabled(true);
-        } else if (GameActivity.GAME_SPOJNICE.equals(gameType)) {
-            View btn = binding.getRoot().findViewById(R.id.btnSpojnice);
-            if (btn != null) btn.setEnabled(true);
-        } else if (GameActivity.GAME_ASOCIJACIJE.equals(gameType)) {
-            binding.btnAsocijacija.setEnabled(true);
+        if (user == null) {
+            binding.btnStartGame.setEnabled(true);
+            return;
         }
+
+        String playerUid = user.getUid();
+        final String finalPlayerName = playerName;
+
+        FirebaseFirestore.getInstance().collection("users").document(playerUid)
+                .update("tokenCount", FieldValue.increment(-1))
+                .addOnSuccessListener(unused -> {
+
+            Toast.makeText(getContext(), "Žeton iskorišćen! Traženje protivnika za partiju...", Toast.LENGTH_SHORT).show();
+
+            // Pokrećemo generalni matchmaking (prosleđujemo "SLAGALICA_CELE_IGRE" ili sličan tag, menadžer će to obraditi)
+            matchmaking = new MatchmakingManager("SLAGALICA_MECH", finalPlayerName, playerUid, new MatchmakingManager.MatchmakingListener() {
+                @Override
+                public void onMatchFound(String roomId, int playerNumber) {
+                    if (!isAdded()) return;
+                    requireActivity().runOnUiThread(() -> {
+                        Intent intent = new Intent(getActivity(), GameActivity.class);
+                        intent.putExtra(GameActivity.EXTRA_ROOM_ID, roomId);
+                        intent.putExtra(GameActivity.EXTRA_PLAYER_NUM, playerNumber);
+                        intent.putExtra(GameActivity.EXTRA_PLAYER_NAME, finalPlayerName);
+                        // Ne šaljemo pojedinačni GAME_TYPE jer GameActivity kreće od prve igre automatski
+                        startActivity(intent);
+                        binding.btnStartGame.setEnabled(true);
+                    });
+                }
+
+                @Override
+                public void onWaiting() {
+                    if (!isAdded()) return;
+                    requireActivity().runOnUiThread(() ->
+                            Toast.makeText(getContext(), "Tražim protivnika za igru...", Toast.LENGTH_SHORT).show()
+                    );
+                }
+
+                @Override
+                public void onError(String message) {
+                    if (!isAdded()) return;
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Greška: " + message, Toast.LENGTH_SHORT).show();
+                        binding.btnStartGame.setEnabled(true);
+                    });
+                }
+            });
+
+            matchmaking.findMatch();
+
+        }).addOnFailureListener(e -> {
+            Toast.makeText(getContext(), "Greška sa bazom.", Toast.LENGTH_SHORT).show();
+            binding.btnStartGame.setEnabled(true);
+        });
     }
 
     private String resolvePlayerName() {
@@ -187,12 +174,7 @@ public class HomeFragment extends Fragment {
                 return user.getEmail();
             }
         }
-
-        if (!TextUtils.isEmpty(currentPlayerName)) {
-            return currentPlayerName;
-        }
-
-        return null;
+        return !TextUtils.isEmpty(currentPlayerName) ? currentPlayerName : null;
     }
 
     @Override

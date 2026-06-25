@@ -13,6 +13,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
@@ -34,12 +35,15 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int INVITE_NOTIF_ID = 9001;
+    private com.google.firebase.database.ChildEventListener backgroundChatListener;
+    private com.google.firebase.database.DatabaseReference backgroundChatRef;
 
     private static final Map<String, String> GAME_LABELS = new LinkedHashMap<>();
     static {
@@ -87,8 +91,50 @@ public class MainActivity extends AppCompatActivity {
 
             if (canAutoLogin) {
                 requestNotifPermissionAndSendDemos();
+                // DODATO: Provera i dodela 5 dnevnih tokena pri automatskom ulasku
+                proveriIDodeliDnevneTokene();
             }
         }
+    }
+
+    /**
+     * DODATO: Implementacija dnevnog sistema tokena (Tačka 3.a pravila)
+     * Proverava datum poslednjeg ulaska i dodeljuje 5 tokena ako je počeo novi dan.
+     */
+    private void proveriIDodeliDnevneTokene() {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) return;
+
+        String uid = currentUser.getUid();
+        DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(uid);
+
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+        String danasnjiDatum = sdf.format(new java.util.Date());
+
+        userRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!snapshot.exists()) return;
+
+                String poslednjaProvera = snapshot.child("lastTokenCheck").getValue(String.class);
+                int trenutniTokeni = snapshot.child("tokens").getValue(Integer.class) != null ?
+                        snapshot.child("tokens").getValue(Integer.class) : 0;
+
+                // Ako korisnik otvara aplikaciju prvi put u danu (ili uopšte)
+                if (poslednjaProvera == null || !poslednjaProvera.equals(danasnjiDatum)) {
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("tokens", trenutniTokeni + 5);
+                    updates.put("lastTokenCheck", danasnjiDatum);
+
+                    userRef.updateChildren(updates).addOnSuccessListener(aVoid ->
+                            Toast.makeText(MainActivity.this, "Dobili ste 5 dnevnih tokena za današnji dan!", Toast.LENGTH_SHORT).show()
+                    );
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
     }
 
     @Override
@@ -103,7 +149,6 @@ public class MainActivity extends AppCompatActivity {
         isInForeground = true;
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(INVITE_NOTIF_ID);
 
-        // Show invite dialog if app was opened via notification tap
         if (pendingInvite != null && pendingInviteId != null) {
             GameInvite invite = pendingInvite;
             pendingInvite = null;
@@ -123,12 +168,29 @@ public class MainActivity extends AppCompatActivity {
         authStateListener = auth -> {
             FirebaseUser user = auth.getCurrentUser();
             if (user != null) {
+                String uid = user.getUid();
+
                 DatabaseReference ref = FirebaseDatabase.getInstance().getReference()
-                        .child("status").child(user.getUid());
+                        .child("status").child(uid);
                 ref.child("isOnline").setValue(true);
                 ref.child("isOnline").onDisconnect().setValue(false);
 
-                startGlobalInviteListener(user.getUid());
+                startGlobalInviteListener(uid);
+
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("users").document(uid)
+                        .get()
+                        .addOnSuccessListener(documentSnapshot -> {
+                            if (documentSnapshot != null && documentSnapshot.exists()) {
+                                String region = documentSnapshot.getString("region");
+                                if (region != null && !region.trim().isEmpty()) {
+
+                                    startBackgroundChatNotificationListener(uid, region);
+                                }
+                            }
+                        });
+
+                proveriIDodeliDnevneTokene();
             }
         };
         FirebaseAuth.getInstance().addAuthStateListener(authStateListener);
@@ -140,8 +202,6 @@ public class MainActivity extends AppCompatActivity {
         if (authStateListener != null) {
             FirebaseAuth.getInstance().removeAuthStateListener(authStateListener);
         }
-        // NOTE: invite listener intentionally NOT removed here so notifications
-        // still arrive when app is minimized. Removed in onDestroy().
     }
 
     @Override
@@ -149,12 +209,16 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         stopGlobalInviteListener();
         dismissInviteDialog();
+        if (backgroundChatListener != null && backgroundChatRef != null) {
+            backgroundChatRef.removeEventListener(backgroundChatListener);
+            backgroundChatListener = null;
+        }
     }
 
     // ── Global invite listener ────────────────────────────────────────────────
 
     private void startGlobalInviteListener(String myUid) {
-        if (inviteChildListener != null) return; // already listening
+        if (inviteChildListener != null) return;
 
         inviteQueryRef = FirebaseDatabase.getInstance().getReference()
                 .child("gameInvites");
@@ -164,10 +228,7 @@ public class MainActivity extends AppCompatActivity {
             public void onChildAdded(@NonNull DataSnapshot snap, String prev) {
                 handleInviteSnapshot(snap, myUid);
             }
-            @Override
-            public void onChildChanged(@NonNull DataSnapshot snap, String prev) {
-                // Ignore — status changes handled by watchInviteStatus
-            }
+            @Override public void onChildChanged(@NonNull DataSnapshot snap, String prev) {}
             @Override public void onChildRemoved(@NonNull DataSnapshot snap) {}
             @Override public void onChildMoved(@NonNull DataSnapshot snap, String prev) {}
             @Override public void onCancelled(@NonNull DatabaseError e) {}
@@ -215,7 +276,6 @@ public class MainActivity extends AppCompatActivity {
                 showInviteDialog(invite);
             } else {
                 postInviteNotification(invite);
-                // Also watch for cancellation while app is in background
                 watchInviteStatusForReceiver(invite);
             }
         });
@@ -277,14 +337,17 @@ public class MainActivity extends AppCompatActivity {
             }
         }.start();
 
-        // Watch for sender cancellation
         watchInviteStatusForReceiver(invite);
     }
 
     private void dismissInviteDialog() {
-        if (inviteCountDown != null) { inviteCountDown.cancel(); inviteCountDown = null; }
-        if (inviteReceivedDialog != null && inviteReceivedDialog.isShowing())
+        if (inviteCountDown != null) {
+            inviteCountDown.cancel();
+            inviteCountDown = null;
+        }
+        if (inviteReceivedDialog != null && inviteReceivedDialog.isShowing()) {
             inviteReceivedDialog.dismiss();
+        }
         inviteReceivedDialog = null;
     }
 
@@ -310,20 +373,25 @@ public class MainActivity extends AppCompatActivity {
         mm.joinDirectRoom(invite.getRoomId());
     }
 
+    /**
+     * PROMENJENO: Ispravljena putanja brisanja sobe.
+     * Soba se sada ispravno briše sa lokacije "rooms/SLAGALICA_MECH/{roomId}" u skladu sa novom arhitekturom.
+     */
     private void declineInvite(GameInvite invite) {
         dismissInviteDialog();
         DatabaseReference rtdb = FirebaseDatabase.getInstance().getReference();
         rtdb.child("gameInvites").child(invite.getInviteId())
                 .child("status").setValue(GameInvite.STATUS_DECLINED);
         rtdb.child("gameInvites").child(invite.getInviteId()).removeValue();
-        rtdb.child("rooms").child(invite.getGameType()).child(invite.getRoomId()).removeValue();
+
+        // KORREKCIJA: Umesto invite.getGameType() sada brišemo fiksnu krovnu strukturu meča
+        rtdb.child("rooms").child(GameActivity.GAME_MECH).child(invite.getRoomId()).removeValue();
         pendingInviteId = null;
     }
 
     private void launchGame(String roomId, String gameType, int playerNum, String playerName) {
         Intent intent = new Intent(this, GameActivity.class);
-        intent.putExtra(GameActivity.EXTRA_GAME_TYPE,  gameType);
-        intent.putExtra(GameActivity.EXTRA_ROOM_ID,    roomId);
+        intent.putExtra(GameActivity.EXTRA_ROOM_ID, roomId);
         intent.putExtra(GameActivity.EXTRA_PLAYER_NUM, playerNum);
         intent.putExtra(GameActivity.EXTRA_PLAYER_NAME, playerName);
         startActivity(intent);
@@ -332,7 +400,7 @@ public class MainActivity extends AppCompatActivity {
     // ── Notification (background) ─────────────────────────────────────────────
 
     private void postInviteNotification(GameInvite invite) {
-        pendingInvite = invite; // will be shown when user returns to app
+        pendingInvite = invite;
         String label = GAME_LABELS.getOrDefault(invite.getGameType(), invite.getGameType());
 
         Intent tapIntent = new Intent(this, MainActivity.class);
@@ -353,7 +421,6 @@ public class MainActivity extends AppCompatActivity {
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
                 .notify(INVITE_NOTIF_ID, nb.build());
 
-        // When app comes back to foreground (onResume), watch for the invite
         watchInviteStatusForReceiver(invite);
     }
 
@@ -369,6 +436,60 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             sendDemos();
+        }
+    }
+
+    private void startBackgroundChatNotificationListener(String myUid, String region) {
+        if (backgroundChatListener != null) return;
+
+        backgroundChatRef = FirebaseDatabase.getInstance().getReference()
+                .child("regional_chats").child(region);
+
+        backgroundChatListener = new com.google.firebase.database.ChildEventListener() {
+            @Override
+            public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+                Long timestamp = snapshot.child("timestamp").getValue(Long.class);
+                if (timestamp == null || (System.currentTimeMillis() - timestamp) > 10_000) {
+                    return;
+                }
+
+                String senderId = snapshot.child("senderId").getValue(String.class);
+                String senderName = snapshot.child("senderName").getValue(String.class);
+                String text = snapshot.child("text").getValue(String.class);
+
+                if (senderId != null && !senderId.equals(myUid) && !SlagalicaApp.isUserInChatScreen) {
+                    prikažiLokalnuChatNotifikaciju(senderName, text);
+                }
+            }
+
+            @Override public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
+            @Override public void onChildRemoved(@NonNull DataSnapshot snapshot) {}
+            @Override public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        };
+
+        backgroundChatRef.limitToLast(1).addChildEventListener(backgroundChatListener);
+    }
+
+    private void prikažiLokalnuChatNotifikaciju(String naslov, String poruka) {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent,
+                PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, SlagalicaApp.CHANNEL_CHAT)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("Nova poruka od: " + naslov)
+                .setContentText(poruka)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+        if (notificationManager != null) {
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
         }
     }
 

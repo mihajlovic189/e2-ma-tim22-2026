@@ -19,63 +19,21 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Dobrodošli u Slagalicu!"
-            android:textSize="24sp"
+            android:textSize="26sp"
             android:textStyle="bold"
-            android:textColor="@color/text" />
+            android:textColor="@color/text"
+            android:layout_marginBottom="30dp" />
 
         <Button
-            android:id="@+id/btnKorakPoKorak"
+            android:id="@+id/btnStartGame"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Igra: Korak po korak"
+            android:layout_height="64dp"
+            android:text="⚡ ZAPOČNI MEČ (KREĆE KVIZ)"
+            android:textSize="18sp"
+            android:textStyle="bold"
             android:textColor="@color/text"
-            android:backgroundTint="@color/primary" />
-
-        <Button
-            android:id="@+id/btnMojBroj"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Igra: Moj broj"
-            android:textColor="@color/text"
-            android:backgroundTint="@color/primary" />
-
-        <Button
-            android:id="@+id/btnAsocijacija"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Igra: Asocijacija"
-            android:textColor="@color/text"
-            android:backgroundTint="@color/primary" />
-
-        <Button
-            android:id="@+id/btnSkocko"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Igra: Skočko"
-            android:textColor="@color/text"
-            android:backgroundTint="@color/primary" />
-
-        <Button
-            android:id="@+id/btnKoZnaZna"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Igra: Ko zna zna"
-            android:textColor="@color/text"
-            android:backgroundTint="@color/primary" />
-
-        <Button
-            android:id="@+id/btnSpojnice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Igra: Spojnice"
-            android:textColor="@color/text"
-            android:backgroundTint="@color/primary" />
+            android:backgroundTint="@color/primary"
+            android:layout_marginBottom="40dp" />
 
         <Button
             android:id="@+id/btnRegionMap"
@@ -95,6 +53,23 @@
             android:textColor="@color/text"
             android:backgroundTint="#1E3A5F" />
 
+        <Button
+            android:id="@+id/btnRegionalChallenges"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🏆 REGIONALNI IZAZOVI"
+            android:backgroundTint="#FF5722"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btnRegionalChat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="💬  Regionalni čet"
+            android:textColor="@color/text"
+            android:backgroundTint="#1E3A5F" />
+
     </LinearLayout>
 
     <ImageButton
@@ -109,7 +84,6 @@
         app:tint="#FFFFFF"
         android:contentDescription="Notifikacije" />
 
-
     <ImageButton
         android:id="@+id/btnProfile"
         android:layout_width="54dp"
@@ -122,6 +96,4 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:scaleType="centerInside" />
 
-
 </FrameLayout>
-

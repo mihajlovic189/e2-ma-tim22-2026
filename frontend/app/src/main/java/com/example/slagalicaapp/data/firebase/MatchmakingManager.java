@@ -1,13 +1,18 @@
 package com.example.slagalicaapp.data.firebase;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.example.slagalicaapp.game.asocijacije.Asocijacija;
 import com.example.slagalicaapp.game.asocijacije.AsocijacijeRepository;
+import com.example.slagalicaapp.game.korakpokorak.KorakPoKorakItem;
+import com.example.slagalicaapp.game.korakpokorak.KorakPoKorakRepository;
 import com.google.firebase.database.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Random;
 
 public class MatchmakingManager {
@@ -18,9 +23,16 @@ public class MatchmakingManager {
         void onError(String message);
     }
 
+    private interface SeedCallback {
+        void onSeeded();
+    }
+
+    private static final long MAIN_SKOCKO_DURATION_MS = 30_000L;
+    private static final int QUEUE_SCAN_LIMIT = 20;
+
     private final DatabaseReference db;
     private final MatchmakingListener listener;
-    private final String gameType;
+    private final String gameType; // Primamo "SLAGALICA_MECH" sa HomeFragment-a
     private final String playerName;
     private final String playerUid;
     private ValueEventListener queueListener;
@@ -50,7 +62,6 @@ public class MatchmakingManager {
                                 String existingStatus = existing.child("status").getValue(String.class);
                                 String existingKey = existing.getKey();
 
-                                // Stale "matched" entry from a previous game — delete and search fresh
                                 if ("matched".equals(existingStatus)) {
                                     if (existingKey != null) {
                                         queueRef.child(existingKey).removeValue();
@@ -59,7 +70,6 @@ public class MatchmakingManager {
                                     return;
                                 }
 
-                                // Still "waiting" — reuse the existing slot
                                 myQueueKey = existingKey;
                                 if (existingKey != null) {
                                     attachQueueListener(queueRef.child(existingKey), existingRoomId);
@@ -82,9 +92,10 @@ public class MatchmakingManager {
 
     private void searchForMatch(DatabaseReference queueRef) {
         queueRef.orderByChild("status").equalTo("waiting")
+                .limitToFirst(QUEUE_SCAN_LIMIT)
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
                         DataSnapshot waitingEntry = null;
                         for (DataSnapshot child : snapshot.getChildren()) {
                             String otherUid = child.child("playerUid").getValue(String.class);
@@ -96,16 +107,10 @@ public class MatchmakingManager {
                         }
 
                         if (waitingEntry != null) {
-                            String roomId = waitingEntry.child("roomId").getValue(String.class);
-                            String opponentKey = waitingEntry.getKey();
-                            if (opponentKey != null) {
-                                queueRef.child(opponentKey).child("status").setValue("matched");
-                                createRoom(roomId, 2);
-                            }
+                            attemptToClaim(queueRef, waitingEntry.getKey());
                         } else {
                             String roomId = db.child("rooms").child(gameType).push().getKey();
                             joinQueue(queueRef, roomId);
-                            listener.onWaiting();
                         }
                     }
 
@@ -116,18 +121,71 @@ public class MatchmakingManager {
                 });
     }
 
+    private void attemptToClaim(DatabaseReference queueRef, String opponentKey) {
+        if (opponentKey == null) {
+            searchForMatch(queueRef);
+            return;
+        }
+        DatabaseReference statusRef = queueRef.child(opponentKey).child("status");
+        statusRef.runTransaction(new Transaction.Handler() {
+            @Override
+            public Transaction.Result doTransaction(@NonNull MutableData currentData) {
+                String current = currentData.getValue(String.class);
+                if (!"waiting".equals(current)) {
+                    return Transaction.abort();
+                }
+                currentData.setValue("matched");
+                return Transaction.success(currentData);
+            }
+
+            @Override
+            public void onComplete(@Nullable DatabaseError error, boolean committed, @Nullable DataSnapshot snapshot) {
+                if (error != null) {
+                    listener.onError(error.getMessage());
+                    return;
+                }
+                if (!committed) {
+                    searchForMatch(queueRef);
+                    return;
+                }
+                queueRef.child(opponentKey).child("roomId").addListenerForSingleValueEvent(
+                        new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot roomIdSnap) {
+                                String roomId = roomIdSnap.getValue(String.class);
+                                if (roomId == null) {
+                                    listener.onError("Soba protivnika nije pronađena.");
+                                    return;
+                                }
+                                createRoom(roomId, 2, false, () -> listener.onMatchFound(roomId, 2));
+                            }
+
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError error) {
+                                listener.onError(error.getMessage());
+                            }
+                        });
+            }
+        });
+    }
+
     private void joinQueue(DatabaseReference queueRef, String roomId) {
-        DatabaseReference myEntry = queueRef.push();
-        myQueueKey = myEntry.getKey();
+        createRoom(roomId, 1, false, () -> {
+            DatabaseReference myEntry = queueRef.push();
+            myQueueKey = myEntry.getKey();
 
-        myEntry.child("roomId").setValue(roomId);
-        myEntry.child("player").setValue(playerName);
-        myEntry.child("playerUid").setValue(playerUid);
-        myEntry.child("status").setValue("waiting");
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("roomId", roomId);
+            entry.put("player", playerName);
+            entry.put("playerUid", playerUid);
+            entry.put("status", "waiting");
+            myEntry.setValue(entry);
 
-        createRoom(roomId, 1);
+            myEntry.onDisconnect().removeValue();
 
-        attachQueueListener(myEntry, roomId);
+            attachQueueListener(myEntry, roomId);
+            listener.onWaiting();
+        });
     }
 
     private void attachQueueListener(DatabaseReference entryRef, String roomId) {
@@ -137,7 +195,7 @@ public class MatchmakingManager {
                 String status = snapshot.child("status").getValue(String.class);
                 if ("matched".equals(status)) {
                     stopListening();
-                    // Delete queue entry so future matchmaking doesn't pick up this stale slot
+                    entryRef.onDisconnect().cancel();
                     if (myQueueKey != null) {
                         db.child("queue").child(gameType).child(myQueueKey).removeValue();
                         myQueueKey = null;
@@ -155,168 +213,198 @@ public class MatchmakingManager {
         entryRef.addValueEventListener(queueListener);
     }
 
-    private void createRoom(String roomId, int playerNumber) {
+    private void createRoom(String roomId, int playerNumber, boolean isFriendly, @Nullable SeedCallback onReady) {
         DatabaseReference roomRef = db.child("rooms").child(gameType).child(roomId);
         long startedAt = System.currentTimeMillis();
 
         if (playerNumber == 1) {
-            roomRef.child("status").setValue("waiting");
+            roomRef.child("status").setValue("seeding");
+            roomRef.child("isFriendly").setValue(isFriendly);
             roomRef.child("player1").setValue(playerName);
             roomRef.child("player1Uid").setValue(playerUid);
-            roomRef.child("currentRound").setValue(1);
             roomRef.child("startedAt").setValue(startedAt);
+
             roomRef.child("scores").child("player1").setValue(0);
             roomRef.child("scores").child("player2").setValue(0);
 
-            if (gameType.equals("KORAK_PO_KORAK")) {
-                roomRef.child("activePlayer").setValue(1);
-                roomRef.child("currentStep").setValue(-1);
-                roomRef.child("roundStatus").setValue("playing");
-                seedKorakRoundsFromPool(roomRef);
-            } else if (gameType.equals("MOJ_BROJ")) {
-                roomRef.child("activePlayer").setValue(1);
-                roomRef.child("roundStatus").setValue("playing");
-                roomRef.child("targetRevealed").setValue(false);
-                roomRef.child("numbersRevealed").setValue(false);
-                roomRef.child("roundEndsAt").setValue(0L);
-            } else if (gameType.equals("SKOCKO")) {
-                roomRef.child("secret1").setValue(generateSkockoSecret());
-                roomRef.child("secret2").setValue(generateSkockoSecret());
-                roomRef.child("phase").setValue("ROUND_1_PLAYING");
-                roomRef.child("phaseEndsAt").setValue(startedAt + MAIN_SKOCKO_DURATION_MS);
-            } else if (gameType.equals("KO_ZNA_ZNA")) {
-                seedKoZnaZnaQuestions(roomRef);
-            } else if (gameType.equals("SPOJNICE")) {
-                roomRef.child("currentRound").setValue(0);
-                roomRef.child("currentPlayer").setValue(1);
-                seedSpojniceGames(roomRef);
-            } else if (gameType.equals("ASOCIJACIJE")) {
-                seedAsocijacije(roomRef);
-                roomRef.child("activePlayer").setValue(1);
-                roomRef.child("turnPhase").setValue("opening");
-                roomRef.child("turnEndsAt").setValue(0L);
-            }
+            roomRef.child("currentGameType").setValue("KO_ZNA_ZNA");
+
+            Map<String, Object> baseStates = new HashMap<>();
+
+            baseStates.put("korakPoKorak/activePlayer", 1);
+            baseStates.put("korakPoKorak/currentStep", -1);
+            baseStates.put("korakPoKorak/currentRound", 1);
+            baseStates.put("korakPoKorak/roundStatus", "playing");
+
+            baseStates.put("mojBroj/activePlayer", 1);
+            baseStates.put("mojBroj/currentRound", 1);
+            baseStates.put("mojBroj/targetRevealed", false);
+            baseStates.put("mojBroj/numbersRevealed", false);
+            baseStates.put("mojBroj/roundEndsAt", 0L);
+            baseStates.put("mojBroj/roundStatus", "waiting");
+
+            baseStates.put("skocko/secret1", generateSkockoSecret());
+            baseStates.put("skocko/secret2", generateSkockoSecret());
+            baseStates.put("skocko/phase", "ROUND_1_PLAYING");
+
+            baseStates.put("asocijacije/currentRound", 1);
+            baseStates.put("asocijacije/round1/activePlayer", 1);
+            baseStates.put("asocijacije/round1/turnPhase", "opening");
+            baseStates.put("asocijacije/round1/turnEndsAt", 0L);
+
+            baseStates.put("spojnice/currentRound", 0);
+            baseStates.put("spojnice/currentPlayer", 1);
+
+            roomRef.updateChildren(baseStates);
+
+            seedKorakRoundsFromPool(roomRef, () -> {
+                seedKoZnaZnaQuestions(roomRef, () -> {
+                    seedSpojniceGames(roomRef, () -> {
+                        seedAsocijacije(roomRef, () -> {
+                            roomRef.child("status").setValue("waiting");
+                            if (onReady != null) onReady.onSeeded();
+                        });
+                    });
+                });
+            });
+
         } else {
             roomRef.child("player2").setValue(playerName);
             roomRef.child("player2Uid").setValue(playerUid);
-            roomRef.child("status").setValue("playing");
-            if (gameType.equals("SKOCKO")) {
-                // Reset phaseEndsAt to now so both players get a fresh countdown
-                roomRef.child("phaseEndsAt")
-                        .setValue(System.currentTimeMillis() + MAIN_SKOCKO_DURATION_MS);
-            } else if (gameType.equals("KO_ZNA_ZNA")) {
-                long now = System.currentTimeMillis();
-                roomRef.child("currentQuestionIndex").setValue(0);
-                roomRef.child("questionStatus").setValue("playing");
-                roomRef.child("questionStartedAt").setValue(now + 2000L);
-            } else if (gameType.equals("SPOJNICE")) {
-                roomRef.child("turnEndsAt").setValue(System.currentTimeMillis() + 32_000L);
-            } else if (gameType.equals("ASOCIJACIJE")) {
-                roomRef.child("gameEndsAt").setValue(System.currentTimeMillis() + 122_000L);
-            }
-            listener.onMatchFound(roomId, 2);
+
+            long now = System.currentTimeMillis();
+            Map<String, Object> joinUpdates = new HashMap<>();
+            joinUpdates.put("status", "playing");
+            joinUpdates.put("koZnaZna/currentQuestionIndex", 0);
+            joinUpdates.put("koZnaZna/questionStatus", "playing");
+            joinUpdates.put("koZnaZna/questionStartedAt", now + 2000L);
+            joinUpdates.put("mojBroj/roundEndsAt", 0L);
+
+            roomRef.updateChildren(joinUpdates);
+
+            if (onReady != null) onReady.onSeeded();
         }
     }
 
-    private static final long MAIN_SKOCKO_DURATION_MS = 30_000L;
-
-    private void seedAsocijacije(DatabaseReference roomRef) {
-        Asocijacija a = AsocijacijeRepository.getNasumicnaAsocijacija();
-        java.util.Map<String, Object> data = new java.util.HashMap<>();
-        for (java.util.Map.Entry<String, String> e : a.polja.entrySet()) {
-            data.put("fields/" + e.getKey(), e.getValue());
+    private void seedAsocijacije(DatabaseReference roomRef, Runnable onDone) {
+        Asocijacija a1 = AsocijacijeRepository.getNasumicnaAsocijacija();
+        Asocijacija a2 = AsocijacijeRepository.getNasumicnaAsocijacija();
+        Map<String, Object> data = new HashMap<>();
+        for (Map.Entry<String, String> e : a1.polja.entrySet()) {
+            data.put("asocijacije/round1/fields/" + e.getKey(), e.getValue());
         }
-        for (java.util.Map.Entry<String, String> e : a.resenjaKolona.entrySet()) {
-            data.put("columnSolutions/" + e.getKey(), e.getValue());
+        for (Map.Entry<String, String> e : a1.resenjaKolona.entrySet()) {
+            data.put("asocijacije/round1/columnSolutions/" + e.getKey(), e.getValue());
         }
-        data.put("finalSolution", a.konacnoResenje);
-        roomRef.updateChildren(data);
+        data.put("asocijacije/round1/finalSolution", a1.konacnoResenje);
+        for (Map.Entry<String, String> e : a2.polja.entrySet()) {
+            data.put("asocijacije/round2/fields/" + e.getKey(), e.getValue());
+        }
+        for (Map.Entry<String, String> e : a2.resenjaKolona.entrySet()) {
+            data.put("asocijacije/round2/columnSolutions/" + e.getKey(), e.getValue());
+        }
+        data.put("asocijacije/round2/finalSolution", a2.konacnoResenje);
+        roomRef.updateChildren(data, (error, ref) -> {
+            if (error != null) listener.onError(error.getMessage());
+            onDone.run();
+        });
     }
 
-    private void seedSpojniceGames(DatabaseReference roomRef) {
+    private void seedSpojniceGames(DatabaseReference roomRef, Runnable onDone) {
         db.child("Spojnice").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 List<DataSnapshot> all = new ArrayList<>();
                 for (DataSnapshot g : snapshot.getChildren()) all.add(g);
-                if (all.isEmpty()) return;
+                if (all.isEmpty()) {
+                    onDone.run();
+                    return;
+                }
                 Collections.shuffle(all, random);
                 int count = Math.min(2, all.size());
 
-                java.util.Map<String, Object> gamesMap = new java.util.HashMap<>();
+                Map<String, Object> gamesMap = new HashMap<>();
                 for (int i = 0; i < count; i++) {
                     DataSnapshot src  = all.get(i);
                     String desc       = src.child("description").getValue(String.class);
-                    gamesMap.put("games/" + i + "/description", desc != null ? desc : "");
+                    gamesMap.put("spojnice/games/" + i + "/description", desc != null ? desc : "");
 
                     List<String> leftKeys   = new ArrayList<>();
                     List<String> rightVals  = new ArrayList<>();
                     for (DataSnapshot pair : src.child("pairs").getChildren()) {
-                        leftKeys .add(pair.getKey());
-                        rightVals.add(pair.getValue(String.class) != null
-                                ? pair.getValue(String.class) : "");
+                        leftKeys.add(pair.getKey());
+                        String v = pair.getValue(String.class);
+                        rightVals.add(v != null ? v : "");
                     }
 
-                    // Shuffle the right column so both players see the same shuffled board
                     List<String> shuffledRights = new ArrayList<>(rightVals);
                     Collections.shuffle(shuffledRights, random);
 
                     for (int j = 0; j < leftKeys.size(); j++) {
-                        gamesMap.put("games/" + i + "/leftItems/"     + j, leftKeys.get(j));
-                        gamesMap.put("games/" + i + "/correctRights/"  + j, rightVals.get(j));
-                        gamesMap.put("games/" + i + "/shuffledRights/" + j, shuffledRights.get(j));
+                        gamesMap.put("spojnice/games/" + i + "/leftItems/"      + j, leftKeys.get(j));
+                        gamesMap.put("spojnice/games/" + i + "/correctRights/"  + j, rightVals.get(j));
+                        gamesMap.put("spojnice/games/" + i + "/shuffledRights/" + j, shuffledRights.get(j));
                     }
-                    gamesMap.put("games/" + i + "/pairCount", leftKeys.size());
+                    gamesMap.put("spojnice/games/" + i + "/pairCount", leftKeys.size());
                 }
-                gamesMap.put("roundCount", count);
-                roomRef.updateChildren(gamesMap);
+                gamesMap.put("spojnice/roundCount", count);
+                roomRef.updateChildren(gamesMap, (error, ref) -> {
+                    if (error != null) listener.onError(error.getMessage());
+                    onDone.run();
+                });
             }
+
             @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
+            public void onCancelled(@NonNull DatabaseError error) {
+                onDone.run();
+            }
         });
     }
 
-    private void seedKoZnaZnaQuestions(DatabaseReference roomRef) {
+    private void seedKoZnaZnaQuestions(DatabaseReference roomRef, Runnable onDone) {
         db.child("KoZnaZna").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 List<DataSnapshot> all = new ArrayList<>();
                 for (DataSnapshot q : snapshot.getChildren()) all.add(q);
-                if (all.isEmpty()) return;
+                if (all.isEmpty()) {
+                    onDone.run();
+                    return;
+                }
                 Collections.shuffle(all, random);
                 int count = Math.min(5, all.size());
 
-                java.util.Map<String, Object> questionsMap = new java.util.HashMap<>();
+                Map<String, Object> questionsMap = new HashMap<>();
                 for (int i = 0; i < count; i++) {
                     DataSnapshot src = all.get(i);
                     String key = String.valueOf(i);
-                    questionsMap.put("questions/" + key + "/questionText",
+                    questionsMap.put("koZnaZna/questions/" + key + "/questionText",
                             src.child("questionText").getValue(String.class));
                     Long correctL = src.child("correctAnswerIndex").getValue(Long.class);
-                    questionsMap.put("questions/" + key + "/correctAnswerIndex",
+                    questionsMap.put("koZnaZna/questions/" + key + "/correctAnswerIndex",
                             correctL != null ? correctL.intValue() : 0);
                     int optIdx = 0;
                     for (DataSnapshot opt : src.child("options").getChildren()) {
-                        questionsMap.put("questions/" + key + "/options/" + optIdx,
+                        questionsMap.put("koZnaZna/questions/" + key + "/options/" + optIdx,
                                 opt.getValue(String.class));
                         optIdx++;
                     }
                 }
-                questionsMap.put("questionCount", count);
-                roomRef.updateChildren(questionsMap);
+                questionsMap.put("koZnaZna/questionCount", count);
+                roomRef.updateChildren(questionsMap, (error, ref) -> {
+                    if (error != null) listener.onError(error.getMessage());
+                    onDone.run();
+                });
             }
 
             @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
+            public void onCancelled(@NonNull DatabaseError error) {
+                onDone.run();
+            }
         });
     }
 
-    private String generateSkockoSecret() {
-        return random.nextInt(6) + "," + random.nextInt(6) + ","
-                + random.nextInt(6) + "," + random.nextInt(6);
-    }
-
-    private void seedKorakRoundsFromPool(DatabaseReference roomRef) {
+    private void seedKorakRoundsFromPool(DatabaseReference roomRef, Runnable onDone) {
         DatabaseReference poolRef = db.child("korak_pool");
         poolRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -325,76 +413,79 @@ public class MatchmakingManager {
                 for (DataSnapshot child : snapshot.getChildren()) {
                     items.add(child);
                 }
-                if (items.isEmpty()) return;
+                if (items.isEmpty()) {
+                    seedKorakRoundsFromLocal(roomRef, onDone);
+                    return;
+                }
 
-                Collections.shuffle(items, new Random());
+                Collections.shuffle(items, random);
                 DataSnapshot r1 = items.get(0);
                 DataSnapshot r2 = items.size() > 1 ? items.get(1) : items.get(0);
 
-                writeKorakRoundFromSnapshot(roomRef, 1, r1);
-                writeKorakRoundFromSnapshot(roomRef, 2, r2);
+                Map<String, Object> roundsMap = new HashMap<>();
+                putKorakRound(roundsMap, 1, r1);
+                putKorakRound(roundsMap, 2, r2);
+
+                roomRef.child("korakPoKorak/rounds").updateChildren(roundsMap, (error, ref) -> {
+                    if (error != null) listener.onError(error.getMessage());
+                    onDone.run();
+                });
             }
 
             @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
+            public void onCancelled(@NonNull DatabaseError error) {
+                seedKorakRoundsFromLocal(roomRef, onDone);
+            }
         });
     }
 
-    private void writeKorakRoundFromSnapshot(DatabaseReference roomRef, int round, DataSnapshot src) {
+    private void seedKorakRoundsFromLocal(DatabaseReference roomRef, Runnable onDone) {
+        KorakPoKorakItem r1 = KorakPoKorakRepository.getRandomItem();
+        KorakPoKorakItem r2 = KorakPoKorakRepository.getRandomItem();
+        Map<String, Object> roundsMap = new HashMap<>();
+        roundsMap.put("1/solution", r1.solution);
+        for (int i = 0; i < r1.steps.size(); i++) {
+            roundsMap.put("1/steps/" + i, r1.steps.get(i));
+        }
+        roundsMap.put("2/solution", r2.solution);
+        for (int i = 0; i < r2.steps.size(); i++) {
+            roundsMap.put("2/steps/" + i, r2.steps.get(i));
+        }
+        roomRef.child("korakPoKorak/rounds").updateChildren(roundsMap, (error, ref) -> {
+            if (error != null) listener.onError(error.getMessage());
+            onDone.run();
+        });
+    }
+
+    private void putKorakRound(Map<String, Object> roundsMap, int round, DataSnapshot src) {
         String solution = src.child("solution").getValue(String.class);
         if (solution != null) {
-            roomRef.child("rounds").child(String.valueOf(round)).child("solution")
-                    .setValue(solution);
+            roundsMap.put(round + "/solution", solution);
         }
         for (int i = 0; i < 7; i++) {
             String step = src.child("steps").child(String.valueOf(i)).getValue(String.class);
             if (step != null) {
-                roomRef.child("rounds").child(String.valueOf(round))
-                        .child("steps").child(String.valueOf(i)).setValue(step);
+                roundsMap.put(round + "/steps/" + i, step);
             }
         }
     }
 
-    private void seedMojBrojRoom(String roomId, String p1, String p2, String p1Uid, String p2Uid, Long startedAt) {
-        DatabaseReference mbRef = db.child("rooms").child("MOJ_BROJ").child(roomId);
-        if (p1 != null) mbRef.child("player1").setValue(p1);
-        if (p2 != null) mbRef.child("player2").setValue(p2);
-        if (p1Uid != null) mbRef.child("player1Uid").setValue(p1Uid);
-        if (p2Uid != null) mbRef.child("player2Uid").setValue(p2Uid);
-        if (startedAt != null) mbRef.child("startedAt").setValue(startedAt);
-        mbRef.child("status").setValue(p2 != null ? "playing" : "waiting");
-        mbRef.child("currentRound").setValue(1);
-        mbRef.child("activePlayer").setValue(1);
-        mbRef.child("scores").child("player1").setValue(0);
-        mbRef.child("scores").child("player2").setValue(0);
-        mbRef.child("roundStatus").setValue("playing");
-        mbRef.child("targetRevealed").setValue(false);
-        mbRef.child("numbersRevealed").setValue(false);
-        mbRef.child("roundEndsAt").setValue(0);
+    private String generateSkockoSecret() {
+        return random.nextInt(6) + "," + random.nextInt(6) + ","
+                + random.nextInt(6) + "," + random.nextInt(6);
     }
 
-
-    // ── Direct (friend-invite) match helpers ─────────────────────────────────
-
-    /**
-     * Creates a game room as player 1 without going through the queue.
-     * Used by the friend-invite flow. Returns the pre-generated roomId.
-     */
-    public String createDirectRoom() {
+    public String createDirectRoom(@Nullable Runnable onRoomReady) {
         String roomId = db.child("rooms").child(gameType).push().getKey();
-        if (roomId != null) createRoom(roomId, 1);
+        if (roomId != null) {
+            createRoom(roomId, 1, true, onRoomReady == null ? null : onRoomReady::run);
+        }
         return roomId;
     }
 
-    /**
-     * Joins an existing room as player 2 and notifies the listener via
-     * {@code onMatchFound(roomId, 2)}. Used when the invited friend accepts.
-     */
     public void joinDirectRoom(String roomId) {
-        createRoom(roomId, 2);
+        createRoom(roomId, 2, true, () -> listener.onMatchFound(roomId, 2));
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     public void stopListening() {
         if (queueListener != null && myQueueKey != null) {
@@ -403,11 +494,12 @@ public class MatchmakingManager {
         }
     }
 
-    @SuppressWarnings("unused")
     public void cancelSearch() {
         stopListening();
         if (myQueueKey != null) {
+            db.child("queue").child(gameType).child(myQueueKey).onDisconnect().cancel();
             db.child("queue").child(gameType).child(myQueueKey).removeValue();
+            myQueueKey = null;
         }
     }
 }

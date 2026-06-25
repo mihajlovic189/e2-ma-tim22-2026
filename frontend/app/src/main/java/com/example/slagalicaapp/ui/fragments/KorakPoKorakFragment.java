@@ -15,6 +15,8 @@ import androidx.appcompat.app.AlertDialog;
 
 import com.example.slagalicaapp.data.firebase.KorakPoKorakManager;
 import com.example.slagalicaapp.databinding.FragmentKorakPoKorakBinding;
+import com.example.slagalicaapp.game.korakpokorak.KorakPoKorakItem;
+import com.example.slagalicaapp.game.korakpokorak.KorakPoKorakRepository;
 import com.example.slagalicaapp.ui.activities.GameActivity;
 
 import com.google.firebase.database.DataSnapshot;
@@ -32,12 +34,14 @@ public class KorakPoKorakFragment extends Fragment {
     private int myPlayerNumber;
     private boolean iAmActivePlayer;
     private FragmentKorakPoKorakBinding binding;
+    private boolean isStandaloneMode;
 
-    private List<String> currentSteps = new ArrayList<>();
+    private final List<String> currentSteps = new ArrayList<>();
     private String currentSolution = "";
     private int activePlayerNumber = 1;
     private int currentStepIndex = -1;
     private boolean isOpponentChance = false;
+    private boolean hasAnsweredThisStep = false;
 
     private int player1TotalPoints = 0;
     private int player2TotalPoints = 0;
@@ -54,14 +58,49 @@ public class KorakPoKorakFragment extends Fragment {
         if (args != null) {
             roomId = args.getString("roomId");
             myPlayerNumber = args.getInt("playerNumber", 1);
+            if (roomId == null) player1TotalPoints = args.getInt("cumulativePoints", 0);
         }
+        isStandaloneMode = (roomId == null);
 
         setupGameUI();
-        setupFirebase();
+
+        if (isStandaloneMode) {
+            setupStandaloneGame();
+        } else {
+            setupFirebase();
+        }
 
         binding.btnPotvrdi.setOnClickListener(v -> checkAnswer());
 
         return binding.getRoot();
+    }
+
+    private void setupStandaloneGame() {
+        KorakPoKorakItem item = KorakPoKorakRepository.getRandomItem();
+        currentSolution = item.solution;
+        currentSteps.clear();
+        currentSteps.addAll(item.steps);
+
+        iAmActivePlayer = true;
+        activePlayerNumber = 1;
+        isOpponentChance = false;
+        hasAnsweredThisStep = false;
+
+        binding.gameStatus.tvPlayer1Name.setText("Ti");
+        binding.gameStatus.tvPlayer2Name.setText("-");
+        binding.etKrajnjeResenje.setText("");
+        binding.etKrajnjeResenje.setEnabled(true);
+        binding.btnPotvrdi.setEnabled(true);
+
+        for (int i = 0; i < binding.stepsContainer.getChildCount(); i++) {
+            TextView tv = (TextView) binding.stepsContainer.getChildAt(i);
+            tv.setText("KORAK " + (i + 1));
+            tv.setAlpha(0.5f);
+        }
+
+        currentStepIndex = 0;
+        revealStep(0);
+        startGlobalTimer();
     }
 
     private void setupFirebase() {
@@ -76,19 +115,20 @@ public class KorakPoKorakFragment extends Fragment {
 
                     @Override
                     public void onRoundStarted(int activePlayer, int round, String solution, List<String> steps) {
+                        if (!isAdded()) return;
                         requireActivity().runOnUiThread(() -> {
                             activePlayerNumber = activePlayer;
                             iAmActivePlayer = (activePlayer == myPlayerNumber);
                             isOpponentChance = false;
+                            hasAnsweredThisStep = false;
                             currentSolution = solution;
                             currentSteps.clear();
                             currentSteps.addAll(steps);
                             startNewRound();
 
-                            if (iAmActivePlayer && currentStepIndex < 0 && firebaseManager != null) {
+                            if (iAmActivePlayer && firebaseManager != null) {
                                 currentStepIndex = 0;
                                 firebaseManager.revealNextStep(0);
-                                revealStep(0);
                             }
 
                             binding.etKrajnjeResenje.setEnabled(iAmActivePlayer);
@@ -98,17 +138,30 @@ public class KorakPoKorakFragment extends Fragment {
 
                     @Override
                     public void onStepRevealed(int stepIndex) {
-                        requireActivity().runOnUiThread(() -> revealStep(stepIndex));
+                        if (!isAdded()) return;
+                        requireActivity().runOnUiThread(() -> {
+                            currentStepIndex = stepIndex;
+                            hasAnsweredThisStep = false;
+                            revealStep(stepIndex);
+
+                            if (iAmActivePlayer && !isOpponentChance) {
+                                binding.etKrajnjeResenje.setEnabled(true);
+                                binding.btnPotvrdi.setEnabled(true);
+                            }
+                        });
                     }
 
                     @Override
                     public void onOpponentAnswering() {
+                        if (!isAdded()) return;
                         requireActivity().runOnUiThread(() -> {
                             isOpponentChance = true;
                             if (mainGameTimer != null) mainGameTimer.cancel();
+
                             boolean iAmOpponent = !iAmActivePlayer;
                             binding.etKrajnjeResenje.setEnabled(iAmOpponent);
                             binding.btnPotvrdi.setEnabled(iAmOpponent);
+
                             Toast.makeText(getContext(),
                                     iAmOpponent ? "Tvoja šansa! 10 sekundi!" : "Protivnik pokušava...",
                                     Toast.LENGTH_SHORT).show();
@@ -118,19 +171,27 @@ public class KorakPoKorakFragment extends Fragment {
 
                     @Override
                     public void onRoundFinished(int p1Score, int p2Score, boolean hasNextRound, boolean solved) {
+                        if (!isAdded()) return;
                         requireActivity().runOnUiThread(() -> {
+                            if (mainGameTimer != null) mainGameTimer.cancel();
+                            if (opponentTimer != null) opponentTimer.cancel();
+
                             player1TotalPoints = p1Score;
                             player2TotalPoints = p2Score;
                             updateScores();
+
                             binding.etKrajnjeResenje.setEnabled(false);
                             binding.btnPotvrdi.setEnabled(false);
+
                             if (!solved && currentSolution != null && !currentSolution.isEmpty()) {
                                 Toast.makeText(getContext(), "Pojam je bio: " + currentSolution, Toast.LENGTH_LONG).show();
                             }
+
                             Toast.makeText(getContext(),
                                     hasNextRound ? "Runda gotova! Spremi se za rundu 2..." : "Kraj igre!",
                                     Toast.LENGTH_LONG).show();
-                            if (hasNextRound && firebaseManager != null) {
+
+                            if (hasNextRound && firebaseManager != null && myPlayerNumber == 1) {
                                 int nextActive = activePlayerNumber == 1 ? 2 : 1;
                                 new Handler().postDelayed(
                                         () -> firebaseManager.startNextRoundIfReady(nextActive), 5000);
@@ -140,12 +201,18 @@ public class KorakPoKorakFragment extends Fragment {
 
                     @Override
                     public void onGameFinished(int p1Score, int p2Score, String forfeitBy, boolean solved) {
+                        if (!isAdded()) return;
                         requireActivity().runOnUiThread(() -> {
+                            if (mainGameTimer != null) mainGameTimer.cancel();
+                            if (opponentTimer != null) opponentTimer.cancel();
+
                             player1TotalPoints = p1Score;
                             player2TotalPoints = p2Score;
                             updateScores();
+
                             binding.btnPotvrdi.setEnabled(false);
                             binding.etKrajnjeResenje.setEnabled(false);
+
                             if (!solved && currentSolution != null && !currentSolution.isEmpty()) {
                                 Toast.makeText(getContext(), "Pojam je bio: " + currentSolution, Toast.LENGTH_LONG).show();
                             }
@@ -173,10 +240,13 @@ public class KorakPoKorakFragment extends Fragment {
     private void startNewRound() {
         isOpponentChance = false;
         currentStepIndex = -1;
+        hasAnsweredThisStep = false;
         if (opponentTimer != null) opponentTimer.cancel();
+        if (mainGameTimer != null) mainGameTimer.cancel();
+
         binding.etKrajnjeResenje.setText("");
-        binding.etKrajnjeResenje.setEnabled(true);
-        binding.btnPotvrdi.setEnabled(true);
+        binding.etKrajnjeResenje.setEnabled(iAmActivePlayer);
+        binding.btnPotvrdi.setEnabled(iAmActivePlayer);
 
         for (int i = 0; i < binding.stepsContainer.getChildCount(); i++) {
             TextView tv = (TextView) binding.stepsContainer.getChildAt(i);
@@ -188,29 +258,38 @@ public class KorakPoKorakFragment extends Fragment {
     }
 
     private void startGlobalTimer() {
-        if (mainGameTimer != null) mainGameTimer.cancel();
-
         mainGameTimer = new CountDownTimer(ROUND_DURATION, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
+                if (!isAdded()) return;
                 int secondsRemaining = (int) (millisUntilFinished / 1000);
                 binding.gameStatus.tvGameTimer.setText(String.valueOf(secondsRemaining));
 
-                int elapsed = (int) ((ROUND_DURATION - millisUntilFinished) / 1000);
-                int stepToOpen = elapsed / 10;
+                if (iAmActivePlayer) {
+                    int elapsed = (int) ((ROUND_DURATION - millisUntilFinished) / 1000);
+                    int stepToOpen = elapsed / 10;
 
-                if (stepToOpen > currentStepIndex && stepToOpen < 7) {
-                    currentStepIndex = stepToOpen;
-                    if (firebaseManager != null) {
-                        firebaseManager.advanceStepIfNeeded(stepToOpen);
+                    if (stepToOpen > currentStepIndex && stepToOpen < 7) {
+                        currentStepIndex = stepToOpen;
+                        if (firebaseManager != null) {
+                            firebaseManager.advanceStepIfNeeded(stepToOpen);
+                        } else if (isStandaloneMode) {
+                            revealStep(stepToOpen);
+                            hasAnsweredThisStep = false;
+                            binding.etKrajnjeResenje.setEnabled(true);
+                            binding.btnPotvrdi.setEnabled(true);
+                        }
                     }
                 }
             }
 
             @Override
             public void onFinish() {
+                if (!isAdded()) return;
                 binding.gameStatus.tvGameTimer.setText("0");
-                handleFailedRound();
+                if (iAmActivePlayer) {
+                    handleFailedRound();
+                }
             }
         }.start();
     }
@@ -224,12 +303,38 @@ public class KorakPoKorakFragment extends Fragment {
     }
 
     private void checkAnswer() {
+        if (hasAnsweredThisStep && !isOpponentChance) {
+            Toast.makeText(getContext(), "Već si pokušao u ovom koraku! Sačekaj sledeći.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String answer = binding.etKrajnjeResenje.getText().toString().trim().toUpperCase();
         String correct = currentSolution;
 
+        if (answer.isEmpty()) return;
+
         if (firebaseManager != null) {
+            hasAnsweredThisStep = true;
+            binding.etKrajnjeResenje.setEnabled(false);
+            binding.btnPotvrdi.setEnabled(false);
+
             firebaseManager.submitAnswer(answer, currentStepIndex, isOpponentChance, correct);
             if (!answer.equalsIgnoreCase(correct)) {
+                Toast.makeText(getContext(), "Netačno!", Toast.LENGTH_SHORT).show();
+                binding.etKrajnjeResenje.setText("");
+            }
+        } else if (isStandaloneMode) {
+            if (answer.equalsIgnoreCase(correct)) {
+                int points = Math.max(0, 20 - (currentStepIndex * 2));
+                if (mainGameTimer != null) mainGameTimer.cancel();
+                binding.etKrajnjeResenje.setEnabled(false);
+                binding.btnPotvrdi.setEnabled(false);
+                Toast.makeText(getContext(), "Tačno! " + points + " bodova.", Toast.LENGTH_SHORT).show();
+                notifyGameFinishedWithPoints(points);
+            } else {
+                hasAnsweredThisStep = true;
+                binding.etKrajnjeResenje.setEnabled(false);
+                binding.btnPotvrdi.setEnabled(false);
                 Toast.makeText(getContext(), "Netačno!", Toast.LENGTH_SHORT).show();
                 binding.etKrajnjeResenje.setText("");
             }
@@ -239,6 +344,13 @@ public class KorakPoKorakFragment extends Fragment {
     private void handleFailedRound() {
         if (firebaseManager != null) {
             firebaseManager.onTimerExpired(isOpponentChance);
+        } else if (isStandaloneMode) {
+            binding.etKrajnjeResenje.setEnabled(false);
+            binding.btnPotvrdi.setEnabled(false);
+            if (currentSolution != null && !currentSolution.isEmpty()) {
+                Toast.makeText(getContext(), "Vreme isteklo! Pojam je bio: " + currentSolution, Toast.LENGTH_LONG).show();
+            }
+            notifyGameFinishedWithPoints(0);
         }
     }
 
@@ -252,12 +364,15 @@ public class KorakPoKorakFragment extends Fragment {
         opponentTimer = new CountDownTimer(10000, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
+                if (!isAdded()) return;
                 binding.gameStatus.tvGameTimer.setText(String.valueOf(millisUntilFinished / 1000));
             }
 
             @Override
             public void onFinish() {
-                if (firebaseManager != null) {
+                if (!isAdded()) return;
+                binding.gameStatus.tvGameTimer.setText("0");
+                if (iAmOpponent && firebaseManager != null) {
                     firebaseManager.onTimerExpired(true);
                 }
             }
@@ -266,10 +381,11 @@ public class KorakPoKorakFragment extends Fragment {
 
     private void loadPlayerNames() {
         DatabaseReference roomRef = FirebaseDatabase.getInstance().getReference()
-                .child("rooms").child("KORAK_PO_KORAK").child(roomId);
+                .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!isAdded() || !snapshot.exists()) return;
                 String p1 = snapshot.child("player1").getValue(String.class);
                 String p2 = snapshot.child("player2").getValue(String.class);
                 if (p1 != null) binding.gameStatus.tvPlayer1Name.setText(p1);
@@ -283,6 +399,14 @@ public class KorakPoKorakFragment extends Fragment {
     private void notifyGameFinished() {
         Bundle result = new Bundle();
         result.putString("game", "KORAK_PO_KORAK");
+        getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
+    }
+
+    private void notifyGameFinishedWithPoints(int points) {
+        if (mainGameTimer != null) mainGameTimer.cancel();
+        Bundle result = new Bundle();
+        result.putString("game", "KORAK_PO_KORAK");
+        result.putInt("points", points);
         getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
     }
 

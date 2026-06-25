@@ -25,6 +25,7 @@ import com.example.slagalicaapp.ui.header.GameHeaderController;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 public class SkockoMultiplayerFragment extends Fragment {
 
@@ -66,6 +67,10 @@ public class SkockoMultiplayerFragment extends Fragment {
     // Local round for active-player evaluation (null for passive player)
     private SkockoRound localRound;
 
+    private boolean isStandaloneMode = false;
+    private int standaloneScore = 0;
+    private int cumulativePoints = 0;
+
     // Scores (kept in sync with Firebase)
     private int p1Score = 0;
     private int p2Score = 0;
@@ -83,8 +88,9 @@ public class SkockoMultiplayerFragment extends Fragment {
 
         Bundle args = getArguments();
         if (args != null) {
-            roomId         = args.getString("roomId");
-            myPlayerNumber = args.getInt("playerNumber", 1);
+            roomId           = args.getString("roomId");
+            myPlayerNumber   = args.getInt("playerNumber", 1);
+            cumulativePoints = args.getInt("cumulativePoints", 0);
         }
 
         headerController = new GameHeaderController(rootView);
@@ -100,9 +106,12 @@ public class SkockoMultiplayerFragment extends Fragment {
     // ─────────────── Firebase ───────────────
 
     private void connectToFirebase() {
-        if (roomId == null) return;
+        if (roomId == null) {
+            setupStandaloneGame();
+            return;
+        }
 
-        skockoManager = new SkockoManager(roomId, new SkockoManager.SkockoListener() {
+        skockoManager = new SkockoManager(roomId, myPlayerNumber, new SkockoManager.SkockoListener() {
 
             @Override
             public void onRoomReady(String p1Name, String p2Name,
@@ -204,12 +213,14 @@ public class SkockoMultiplayerFragment extends Fragment {
 
         renderFeedbackForRow(row, reds, yellows);
 
-        // Advance cursor for input
-        currentRow = guessIndex + 2;
+        if (isStealPhase) {
+            currentRow = row;
+        } else {
+            currentRow = guessIndex + 2;
+        }
         currentCol = 1;
         btnConfirmRow.setVisibility(View.GONE);
 
-        // Re-enable input for active player (overridden by handlePhaseChange if phase changes)
         if (iAmActive && !isGameOver) {
             setSymbolButtonsEnabled(true);
         }
@@ -225,7 +236,6 @@ public class SkockoMultiplayerFragment extends Fragment {
             btn.setOnClickListener(v -> {
                 if (!iAmActive || isGameOver) return;
                 if (currentRow > MAX_ROWS) return;
-                if (isStealPhase && currentRow > 1) return;
                 if (currentCol > MAX_COLS) return;
 
                 ImageView cell = getCellView(currentRow, currentCol);
@@ -275,14 +285,26 @@ public class SkockoMultiplayerFragment extends Fragment {
             }
 
             int guessIndex = currentRow - 1;
-            String roundKey = currentPhase.startsWith("ROUND_1") ? "round1" : "round2";
-            Map<String, Object> phaseUpdate = buildPhaseUpdate(fb, guessIndex);
 
-            skockoManager.writeGuessAndAdvance(roundKey, guessIndex, ordinals,
-                    fb.getReds(), fb.getYellows(), phaseUpdate);
-
-            btnConfirmRow.setVisibility(View.GONE);
-            setSymbolButtonsEnabled(false); // Wait for Firebase echo
+            if (isStandaloneMode) {
+                // renderGuess re-enables symbols and hides btnConfirmRow internally
+                renderGuess(guessIndex, ordinals, fb.getReds(), fb.getYellows());
+                if (fb.isWin()) {
+                    standaloneScore = SkockoRound.scoreForAttempt(guessIndex + 1);
+                    if (headerController != null) headerController.setScores(cumulativePoints + standaloneScore, 0);
+                    gameFinishHandler.postDelayed(() -> { if (isAdded()) notifyGameFinished(); }, 1500);
+                } else if (guessIndex >= MAX_ROWS - 1) {
+                    standaloneScore = 0;
+                    gameFinishHandler.postDelayed(() -> { if (isAdded()) notifyGameFinished(); }, 1500);
+                }
+            } else {
+                btnConfirmRow.setVisibility(View.GONE);
+                setSymbolButtonsEnabled(false); // Wait for Firebase echo
+                String roundKey = currentPhase.startsWith("ROUND_1") ? "round1" : "round2";
+                Map<String, Object> phaseUpdate = buildPhaseUpdate(fb, guessIndex);
+                skockoManager.writeGuessAndAdvance(roundKey, guessIndex, ordinals,
+                        fb.getReds(), fb.getYellows(), phaseUpdate);
+            }
         });
     }
 
@@ -345,14 +367,20 @@ public class SkockoMultiplayerFragment extends Fragment {
             @Override
             public void onFinish() {
                 if (timerView != null) timerView.setText("0");
-                if (iAmActive && !isGameOver) handleTimerExpired();
+                if (iAmActive && !isGameOver) {
+                    if (isStandaloneMode) {
+                        standaloneScore = 0;
+                        gameFinishHandler.post(() -> { if (isAdded()) notifyGameFinished(); });
+                    } else {
+                        handleTimerExpired();
+                    }
+                }
             }
         }.start();
     }
 
     private void handleTimerExpired() {
         if (isGameOver) return;
-        Map<String, Object> upd = new HashMap<>();
         String nextPhase;
 
         switch (currentPhase) {
@@ -364,18 +392,7 @@ public class SkockoMultiplayerFragment extends Fragment {
         }
 
         long nextEndsAt = computeNextEndsAt(nextPhase);
-        upd.put("phase",       nextPhase);
-        upd.put("phaseEndsAt", nextEndsAt);
-        upd.put("scores/player1", p1Score);
-        upd.put("scores/player2", p2Score);
-
-        if ("FINISHED".equals(nextPhase)) {
-            upd.put("winner", winner());
-            upd.put("status", "game_finished");
-            upd.put("finishedAt", System.currentTimeMillis());
-        }
-
-        skockoManager.advancePhase(upd);
+        skockoManager.advancePhaseAtomic(currentPhase, nextPhase, nextEndsAt, p1Score, p2Score);
     }
 
     private long computeNextEndsAt(String phase) {
@@ -413,9 +430,34 @@ public class SkockoMultiplayerFragment extends Fragment {
         gameFinishHandler.postDelayed(() -> { if (isAdded()) notifyGameFinished(); }, 3000);
     }
 
+    private void setupStandaloneGame() {
+        isStandaloneMode = true;
+        Random rng = new Random();
+        SkockoSymbol[] secret = new SkockoSymbol[]{
+            SkockoSymbol.random(rng), SkockoSymbol.random(rng),
+            SkockoSymbol.random(rng), SkockoSymbol.random(rng)
+        };
+        secret1Ordinals = new int[]{secret[0].ordinal(), secret[1].ordinal(),
+                                    secret[2].ordinal(), secret[3].ordinal()};
+        localRound = new SkockoRound(secret);
+        iAmActive = true;
+        currentPhase = "ROUND_1_PLAYING";
+        isStealPhase = false;
+        currentRow = 1;
+        currentCol = 1;
+        if (headerController != null) {
+            headerController.setPlayerNames("Ti", "—");
+            headerController.setScores(cumulativePoints, 0);
+        }
+        setSymbolButtonsEnabled(true);
+        startPhaseTimer(MAIN_DURATION_MS);
+        if (getContext() != null) Toast.makeText(getContext(), "Pogodi kombinaciju od 4 simbola!", Toast.LENGTH_SHORT).show();
+    }
+
     private void notifyGameFinished() {
         if (!isAdded()) return;
         Bundle result = new Bundle();
+        result.putInt("points", isStandaloneMode ? standaloneScore : 0);
         result.putString("game", "SKOCKO");
         getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
     }

@@ -107,7 +107,7 @@ public class AuthRepository {
         String email = isGuest ? ("guest_" + uid + "@slagalica.app") : user.getEmail();
         userData.put("email", email);
         userData.put("avatarUri", "");
-        userData.put("tokenCount", 0);
+        userData.put("tokenCount", 5); // Novi igrači dobijaju 5 tokena pri registraciji
         userData.put("totalStars", 0);
         userData.put("totalGamesPlayed", 0);
         userData.put("wins", 0);
@@ -130,6 +130,11 @@ public class AuthRepository {
         userData.put("previousCycleRank", 0L);
         userData.put("previousMonthlyStars", 0L);
         userData.put("previousCycleMonth", "");
+
+        // Daily token tracking
+        long now = System.currentTimeMillis();
+        userData.put("lastTokenRefresh", now);
+        userData.put("nextTokenRefreshTime", now + 86_400_000L); // +24 sata
 
         db.collection("users").document(uid)
                 .set(userData)

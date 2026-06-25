@@ -22,4 +22,27 @@
     <string name="placeholder_three">"???"</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="challenges_title_prefix">Regionalni Izazovi - %1$s</string>
+    <string name="btn_create_challenge">Kreiraj novi izazov (Mini-Turnir)</string>
+    <string name="active_challenges_label">Aktivni izazovi u vašem regionu:</string>
+    <string name="challenge_host_label">Domaćin: %1$s</string>
+    <string name="challenge_wager_label">Ulog: %1$d 🌟 | %2$d 🪙</string>
+    <string name="challenge_players_count">Igrača: %1$d/%2$d</string>
+    <string name="btn_action_accept">Prihvati</string>
+    <string name="btn_action_results">Rezultati</string>
+    <string name="btn_action_in_progress">U toku</string>
+    <string name="btn_action_play_again">Igraj opet</string>
+    <string name="btn_regional_challenges_title">Regionalni Izazovi</string>
+    <string name="dialog_create_title">Postavi novi Izazov</string>
+    <string name="dialog_btn_wager">Licitiraj</string>
+    <string name="dialog_btn_cancel">Odustani</string>
+    <string name="error_max_wager">Maksimalan ulog je 10 zvezda i 2 tokena!</string>
+    <string name="challenge_created_success">Izazov uspešno kreiran! Čekanje igrača...</string>
+
+    <string name="dialog_results_title">Konačni bilans Mini-Turnira</string>
+    <string name="dialog_results_wager_summary">Ulog po igraču: %1$d 🌟 / %2$d 🪙\n\n</string>
+    <string name="dialog_results_heading">RANG LISTA OSVOJENIH BODOVA:\n</string>
+    <string name="dialog_results_row">%1$d. %2$s -> %3$d poena</string>
+    <string name="suffix_first_place"> 🏆 (Osvaja 75% fonda)</string>
+    <string name="suffix_second_place"> 🥈 (Povraćaj uloga)</string>
 </resources>

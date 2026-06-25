@@ -22,6 +22,7 @@ import com.example.slagalicaapp.data.firebase.KoZnaZnaManager;
 import com.example.slagalicaapp.model.Question;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -60,6 +61,9 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
 
     private CountDownTimer questionTimer;
     private final Handler handler = new Handler();
+    private boolean isStandaloneMode = false;
+    private int standaloneScore = 0;
+    private int cumulativePoints = 0;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -92,8 +96,9 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
 
         Bundle args = getArguments();
         if (args != null) {
-            roomId       = args.getString("roomId");
+            roomId         = args.getString("roomId");
             myPlayerNumber = args.getInt("playerNumber", 1);
+            cumulativePoints = args.getInt("cumulativePoints", 0);
         }
         isCoordinator = (myPlayerNumber == 1);
 
@@ -102,10 +107,15 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
             answerButtons[i].setOnClickListener(v -> onAnswerClicked(answerIndex));
         }
 
-        manager = new KoZnaZnaManager(roomId, myPlayerNumber, this);
-        manager.startListening();
-
-        tvQuestionText.setText("Čekamo igrača 2…");
+        if (roomId == null) {
+            isStandaloneMode = true;
+            isCoordinator = true;
+            setupStandaloneGame();
+        } else {
+            manager = new KoZnaZnaManager(roomId, myPlayerNumber, this);
+            manager.startListening();
+            tvQuestionText.setText("Čekamo igrača 2…");
+        }
     }
 
     // ─── KoZnaZnaListener ───────────────────────────────────────────────────
@@ -156,15 +166,16 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
     }
 
     @Override
-    public void onAnswerSubmitted(int playerNum, int answerIndex) {
+    public void onAnswerSubmitted(int playerNum, int answerIndex, long clientClickTime) {
         requireActivity().runOnUiThread(() -> {
-            long now = System.currentTimeMillis();
             if (playerNum == 1) {
-                p1TrackedAnswer = answerIndex; p1Answered = true;
-                if (p1AnswerTime == 0) p1AnswerTime = now; // don't override time set by local click
+                p1TrackedAnswer = answerIndex;
+                p1Answered = true;
+                p1AnswerTime = clientClickTime;
             } else {
-                p2TrackedAnswer = answerIndex; p2Answered = true;
-                if (p2AnswerTime == 0) p2AnswerTime = now;
+                p2TrackedAnswer = answerIndex;
+                p2Answered = true;
+                p2AnswerTime = clientClickTime;
             }
 
             if (isCoordinator && p1Answered && p2Answered) {
@@ -251,17 +262,25 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         setAnswersEnabled(false);
         myLocalAnswer = answerIndex;
         answerButtons[answerIndex].setBackgroundTintList(
-                ColorStateList.valueOf(Color.parseColor("#3B82F6"))); // blue — "submitted"
+                ColorStateList.valueOf(Color.parseColor("#3B82F6")));
 
-        // Record click time before Firebase round-trip
-        long now = System.currentTimeMillis();
-        if (myPlayerNumber == 1) { p1AnswerTime = now; p1TrackedAnswer = answerIndex; p1Answered = true; }
-        else                     { p2AnswerTime = now; p2TrackedAnswer = answerIndex; p2Answered = true; }
-
-        manager.submitAnswer(currentQuestionIndex, answerIndex);
-
-        if (isCoordinator && p1Answered && p2Answered) {
-            evaluateAndPublish();
+        if (isStandaloneMode) {
+            standaloneEvaluate(answerIndex);
+        } else {
+            long kliknutoU = System.currentTimeMillis();
+            if (myPlayerNumber == 1) {
+                p1AnswerTime = kliknutoU;
+                p1TrackedAnswer = answerIndex;
+                p1Answered = true;
+            } else {
+                p2AnswerTime = kliknutoU;
+                p2TrackedAnswer = answerIndex;
+                p2Answered = true;
+            }
+            manager.submitAnswer(currentQuestionIndex, answerIndex, kliknutoU);
+            if (isCoordinator && p1Answered && p2Answered) {
+                evaluateAndPublish();
+            }
         }
     }
 
@@ -281,11 +300,9 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         boolean p1Correct = p1Answered && (p1TrackedAnswer == correct);
         boolean p2Correct = p2Answered && (p2TrackedAnswer == correct);
 
-        // Only the FIRST correct answerer gets POINTS_CORRECT; wrong answers always lose POINTS_INCORRECT
         if (p1Correct && p2Correct) {
-            boolean p1First = (p1AnswerTime > 0 && p2AnswerTime > 0)
-                    ? p1AnswerTime <= p2AnswerTime
-                    : (p1AnswerTime > 0); // if only one time is known, they answered first
+            // Savršeno pošteno poređenje mrežnih timestamp-ova
+            boolean p1First = (p1AnswerTime <= p2AnswerTime);
             if (p1First) newP1Score += POINTS_CORRECT;
             else         newP2Score += POINTS_CORRECT;
         } else if (p1Correct) {
@@ -293,6 +310,7 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         } else if (p2Correct) {
             newP2Score += POINTS_CORRECT;
         }
+
         if (p1Answered && !p1Correct) newP1Score += POINTS_INCORRECT;
         if (p2Answered && !p2Correct) newP2Score += POINTS_INCORRECT;
 
@@ -325,7 +343,8 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
                 tvTimer.setText("00:00");
                 progressTimer.setProgress(0);
                 setAnswersEnabled(false);
-                if (isCoordinator) evaluateAndPublish();
+                if (isStandaloneMode) standaloneEvaluate(-1);
+                else if (isCoordinator) evaluateAndPublish();
             }
         }.start();
     }
@@ -366,6 +385,74 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
             answerButtons[oppAnswer].setBackgroundTintList(
                     ColorStateList.valueOf(Color.parseColor("#F97316")));
         }
+    }
+
+    private void setupStandaloneGame() {
+        questions = Arrays.asList(
+            new Question("Koji je glavni grad Srbije?", Arrays.asList("Niš", "Beograd", "Novi Sad", "Kragujevac"), 1),
+            new Question("Koliko dana ima u jednoj nedelji?", Arrays.asList("5", "6", "7", "8"), 2),
+            new Question("Ko je napisao ep 'Gorski vijenac'?", Arrays.asList("Vuk Stefanović", "Petar P. Njegoš", "Jovan Zmaj", "Ivo Andrić"), 1),
+            new Question("Koja planeta je najbliža Suncu?", Arrays.asList("Venera", "Mars", "Zemlja", "Merkur"), 3),
+            new Question("Koliko sekundi ima jedan minut?", Arrays.asList("100", "50", "60", "30"), 2)
+        );
+        tvP1Name.setText("Ti");
+        tvP2Name.setText("—");
+        tvP1Score.setText(String.valueOf(cumulativePoints));
+        tvP2Score.setText("—");
+        standaloneAdvanceToQuestion(0);
+    }
+
+    private void standaloneAdvanceToQuestion(int index) {
+        if (!isAdded()) return;
+        if (index >= questions.size()) {
+            standaloneFinishGame();
+            return;
+        }
+        currentQuestionIndex = index;
+        evaluated = false;
+        myLocalAnswer = -1;
+        resetButtonColors();
+        setAnswersEnabled(true);
+
+        Question q = questions.get(index);
+        tvQuestionNumber.setText(String.format(Locale.getDefault(), "Pitanje %d/%d", index + 1, questions.size()));
+        tvQuestionText.setText(q.getQuestionText());
+        List<String> opts = q.getOptions();
+        String[] labels = {"A", "B", "C", "D"};
+        for (int i = 0; i < answerButtons.length && i < opts.size(); i++) {
+            answerButtons[i].setText(labels[i] + ". " + opts.get(i));
+        }
+        startQuestionTimer(QUESTION_TIME_MS);
+    }
+
+    private void standaloneEvaluate(int chosenIndex) {
+        if (evaluated) return;
+        evaluated = true;
+        cancelTimer();
+        setAnswersEnabled(false);
+
+        Question q = questions.get(currentQuestionIndex);
+        int correct = q.getCorrectAnswerIndex();
+        if (chosenIndex == correct) standaloneScore += POINTS_CORRECT;
+
+        tvP1Score.setText(String.valueOf(cumulativePoints + standaloneScore));
+        highlightAnswers(chosenIndex, -1, correct);
+        List<String> opts = q.getOptions();
+        tvQuestionNumber.setText("Tačan: " + (correct >= 0 && correct < opts.size() ? opts.get(correct) : "?"));
+
+        handler.postDelayed(() -> {
+            if (!isAdded()) return;
+            standaloneAdvanceToQuestion(currentQuestionIndex + 1);
+        }, 2000);
+    }
+
+    private void standaloneFinishGame() {
+        isGameOver = true;
+        setAnswersEnabled(false);
+        tvQuestionText.setText("Igra završena! Ukupno: " + standaloneScore + " poena");
+        Bundle result = new Bundle();
+        result.putInt("points", standaloneScore);
+        getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
     }
 
     @Override

@@ -4,4 +4,12 @@
     <color name="text">#FFFFFF</color>
     <color name="hint">#9CA3AF</color>
     <color name="button_bg">#1E293B</color>
+    <color name="challenge_bg">#F5F5F5</color>
+    <color name="challenge_text_dark">#333333</color>
+    <color name="challenge_text_muted">#555555</color>
+    <color name="challenge_text_light">#777777</color>
+
+    <color name="btn_create_orange">#FF9800</color>
+    <color name="btn_accept_green">#4CAF50</color>
+    <color name="btn_results_blue">#2196F3</color>
 </resources>
