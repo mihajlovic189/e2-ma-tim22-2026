@@ -49,6 +49,8 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
     private int p1Score       = 0;
     private int p2Score       = 0;
     private boolean iAmActive = false;
+    private Set<Integer> failedByP1 = new HashSet<>();
+    private Set<Integer> lostByP2   = new HashSet<>();
 
     private CountDownTimer countDownTimer;
     private final Handler handler = new Handler();
@@ -124,6 +126,7 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
     public void onTurnStarted(int round, int total, int activePl, long turnEndsAt,
                               List<String> lefts, List<String> shuffled, List<String> correct,
                               String description, Map<Integer, Integer> resolved,
+                              Set<Integer> failedP1, Set<Integer> lostP2,
                               int p1Sc, int p2Sc) {
         requireActivity().runOnUiThread(() -> {
             if (isGameOver) return;
@@ -141,6 +144,8 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
             shuffledRights  = new ArrayList<>(shuffled);
             correctRights   = new ArrayList<>(correct);
             resolvedThisRound = new HashMap<>(resolved);
+            failedByP1      = new HashSet<>(failedP1);
+            lostByP2        = new HashSet<>(lostP2);
 
             tvP1Score.setText(String.valueOf(p1Score));
             tvP2Score.setText(String.valueOf(p2Score));
@@ -223,11 +228,18 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
             rightBtn.setOnClickListener(v -> onRightClicked(rightPos));
 
             boolean leftResolved = resolvedThisRound.containsKey(i);
+            boolean leftFailed   = failedByP1.contains(i);
+            boolean leftLost     = lostByP2.contains(i);
             boolean rightUsed    = usedRightPositions.contains(i);
 
-            if (leftResolved) {
-                applyTint(leftBtn,  "#22C55E");
+            if (leftResolved || leftLost) {
+                // Zelena = tačno spojeno | Crvena = oba igrača pogrešila
+                applyTint(leftBtn, leftResolved ? "#22C55E" : "#EF4444");
                 leftBtn.setEnabled(false);
+            } else if (leftFailed) {
+                // Narandžasta: igrač1 pogrešio — igrač2 može da pokuša, igrač1 ne može ponovo
+                applyTint(leftBtn, "#F97316");
+                leftBtn.setEnabled(iAmActive);
             } else {
                 leftBtn.setBackgroundTintList(null);
                 leftBtn.setEnabled(iAmActive);

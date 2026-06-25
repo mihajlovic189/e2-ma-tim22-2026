@@ -1,6 +1,7 @@
 package com.example.slagalicaapp.ui.fragments;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -8,174 +9,265 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.firebase.MatchmakingManager;
 import com.example.slagalicaapp.data.models.FriendData;
+import com.example.slagalicaapp.data.models.GameInvite;
+import com.example.slagalicaapp.databinding.FragmentFriendsBinding;
 import com.example.slagalicaapp.ui.activities.GameActivity;
+import com.example.slagalicaapp.ui.adapters.FriendsAdapter;
+import com.example.slagalicaapp.viewmodels.FriendsViewModel;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.auth.FirebaseUser;
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanIntentResult;
+import com.journeyapps.barcodescanner.ScanOptions;
 
-import java.util.HashMap;
-import java.util.Map;
+import androidx.activity.result.ActivityResultLauncher;
 
 public class FriendsFragment extends Fragment {
 
-    private RecyclerView rvFriends;
-    private DatabaseReference db;
-    private FirebaseAuth auth;
-    private String currentUserName = "Marko";
-    private ValueEventListener inviteResponseListener;
-    private DatabaseReference currentInviteRef;
+    private FragmentFriendsBinding binding;
+    private FriendsViewModel       vm;
+    private FriendsAdapter         friendsAdapter;
+    private FriendsAdapter         searchAdapter;
 
-    @Nullable
+    private AlertDialog inviteSentDialog;
+    private String      sentInviteId;
+    private String      sentRoomId;
+    private String      sentGameType;
+
+
+    private final ActivityResultLauncher<ScanOptions> qrScanLauncher =
+            registerForActivityResult(new ScanContract(), this::onQrResult);
+
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_friends, container, false);
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             ViewGroup container, Bundle savedInstanceState) {
+        binding = FragmentFriendsBinding.inflate(inflater, container, false);
+        vm      = new ViewModelProvider(this).get(FriendsViewModel.class);
 
-        db = FirebaseDatabase.getInstance().getReference();
-        auth = FirebaseAuth.getInstance();
+        setupAdapters();
+        setupTabs();
+        setupListeners();
+        loadFriends();
 
-        rvFriends = view.findViewById(R.id.rvFriends);
-        rvFriends.setLayoutManager(new LinearLayoutManager(getContext()));
-
-        return view;
+        return binding.getRoot();
     }
 
-    /**
-     * Pozovi ovu metodu unutar tvog FriendsAdapter-a kada korisnik klikne na nekog prijatelja.
-     */
-    public void prikaziIzborIgre(FriendData friend) {
-        String[] igre = {"Ko zna zna", "Spojnice", "Asocijacije", "Skočko", "Korak po korak", "Moj broj"};
-        String[] gameTypes = {"KO_ZNA_ZNA", "SPOJNICE", "ASOCIJACIJE", "SKOCKO", "KORAK_PO_KORAK", "MOJ_BROJ"};
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Izaberi igru za duel sa " + friend.getUsername());
-        builder.setItems(igre, (dialog, which) -> {
-            String izabranaIgra = gameTypes[which];
-            posaljiPozivnicu(friend, izabranaIgra);
+    private void setupAdapters() {
+        friendsAdapter = new FriendsAdapter(FriendsAdapter.Mode.FRIENDS, new FriendsAdapter.Callbacks() {
+            @Override public void onInviteClick(FriendData f) { sendInvite(f); }
+            @Override public void onAddClick(FriendData f)    {}
+            @Override public void onRemoveClick(FriendData f) { removeFriend(f); }
         });
-        builder.show();
+
+        searchAdapter = new FriendsAdapter(FriendsAdapter.Mode.SEARCH, new FriendsAdapter.Callbacks() {
+            @Override public void onInviteClick(FriendData f) {}
+            @Override public void onAddClick(FriendData f)    { addFriend(f); }
+            @Override public void onRemoveClick(FriendData f) {}
+        });
+
+        binding.rvFriends.setLayoutManager(new LinearLayoutManager(requireContext()));
+        binding.rvFriends.setAdapter(friendsAdapter);
+
+        binding.rvSearchResults.setLayoutManager(new LinearLayoutManager(requireContext()));
+        binding.rvSearchResults.setAdapter(searchAdapter);
     }
 
-    private void posaljiPozivnicu(FriendData friend, String gameType) {
-        if (auth.getCurrentUser() == null) return;
-        String myUid = auth.getCurrentUser().getUid();
+    private void setupTabs() {
+        binding.tabFriendsList.setOnClickListener(v -> switchTab(true));
+        binding.tabSearch.setOnClickListener(v -> switchTab(false));
+        switchTab(true);
+    }
 
-        final String[] finalRoomIdHolder = new String[1];
+    private void switchTab(boolean showFriends) {
+        binding.panelFriendsList.setVisibility(showFriends ? View.VISIBLE : View.GONE);
+        binding.panelSearch.setVisibility(showFriends ? View.GONE : View.VISIBLE);
+        binding.tabFriendsList.setTextColor(showFriends ? Color.WHITE : Color.parseColor("#9CA3AF"));
+        binding.tabSearch.setTextColor(showFriends ? Color.parseColor("#9CA3AF") : Color.WHITE);
+    }
 
-        MatchmakingManager manager = new MatchmakingManager(gameType, currentUserName, myUid, new MatchmakingManager.MatchmakingListener() {
-            @Override
-            public void onMatchFound(String roomId, int playerNumber) {
-                pokreniIgru(roomId, gameType, playerNumber);
-            }
+    private void setupListeners() {
+        binding.btnFriendsBack.setOnClickListener(v ->
+                requireActivity().getSupportFragmentManager().popBackStack());
 
-            @Override
-            public void onWaiting() {}
-
-            @Override
-            public void onError(String message) {
-                Toast.makeText(getContext(), "Greška: " + message, Toast.LENGTH_SHORT).show();
-            }
+        binding.btnScanQr.setOnClickListener(v -> {
+            ScanOptions opts = new ScanOptions();
+            opts.setDesiredBarcodeFormats(ScanOptions.QR_CODE);
+            opts.setPrompt("Skeniraj QR kod prijatelja");
+            opts.setOrientationLocked(false);
+            qrScanLauncher.launch(opts);
         });
 
-        String generatedRoomId = manager.createDirectRoom(() -> {
-            String currentRoomId = finalRoomIdHolder[0];
-
-            if (currentRoomId == null) return;
-
-            Map<String, Object> inviteData = new HashMap<>();
-            inviteData.put("senderUid", myUid);
-            inviteData.put("senderName", currentUserName);
-            inviteData.put("gameType", gameType);
-            inviteData.put("roomId", currentRoomId);
-            inviteData.put("status", "pending");
-
-            currentInviteRef = db.child("game_invites").child(friend.getUid());
-            currentInviteRef.setValue(inviteData)
-                    .addOnSuccessListener(unused -> {
-                        prikaziCekanjeDijalog(friend, manager);
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(getContext(), "Neuspešno slanje pozivnice: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    });
+        binding.btnSearch.setOnClickListener(v -> {
+            String q = binding.etSearchUsername.getText().toString().trim();
+            if (q.isEmpty()) return;
+            vm.searchByUsername(q).observe(getViewLifecycleOwner(), results -> {
+                searchAdapter.setItems(results);
+                binding.tvSearchEmpty.setVisibility(
+                        results == null || results.isEmpty() ? View.VISIBLE : View.GONE);
+            });
         });
+    }
 
-        finalRoomIdHolder[0] = generatedRoomId;
+    private void loadFriends() {
+        vm.getFriends().observe(getViewLifecycleOwner(), friends -> {
+            friendsAdapter.setItems(friends);
+            binding.tvNoFriends.setVisibility(
+                    friends == null || friends.isEmpty() ? View.VISIBLE : View.GONE);
+        });
+    }
 
-        if (generatedRoomId == null) {
+    private void addFriend(FriendData fd) {
+        vm.addFriend(fd).observe(getViewLifecycleOwner(), ok -> {
+            if (Boolean.TRUE.equals(ok)) {
+                Toast.makeText(getContext(), fd.getUsername() + " dodat u prijatelje!", Toast.LENGTH_SHORT).show();
+                fd.setAlreadyFriend(true);
+                searchAdapter.notifyDataSetChanged();
+                loadFriends();
+            } else {
+                Toast.makeText(getContext(), "Greška pri dodavanju.", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void removeFriend(FriendData fd) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Ukloni prijatelja")
+                .setMessage("Sigurno želiš da ukloniš " + fd.getUsername() + " iz liste prijatelja?")
+                .setPositiveButton("Ukloni", (d, w) ->
+                        vm.removeFriend(fd.getUid()).observe(getViewLifecycleOwner(), ok -> {
+                            if (Boolean.TRUE.equals(ok)) loadFriends();
+                            else Toast.makeText(getContext(), "Greška.", Toast.LENGTH_SHORT).show();
+                        }))
+                .setNegativeButton("Otkaži", null)
+                .show();
+    }
+
+    private void onQrResult(ScanIntentResult result) {
+        if (result == null || result.getContents() == null) return;
+        String content = result.getContents();
+
+        if (!content.startsWith("slagalica://invite?")) {
+            Toast.makeText(getContext(), "Nevažeći QR kod.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            String[] params = content.substring("slagalica://invite?".length()).split("&");
+            String uid = "", username = "";
+            for (String p : params) {
+                if (p.startsWith("uid="))      uid      = p.substring(4);
+                if (p.startsWith("username=")) username = p.substring(9);
+            }
+            FirebaseUser me = FirebaseAuth.getInstance().getCurrentUser();
+            if (uid.isEmpty() || (me != null && uid.equals(me.getUid()))) {
+                Toast.makeText(getContext(), "Ne možeš dodati sebe.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            addFriend(new FriendData(uid, username, ""));
+        } catch (Exception e) {
+            Toast.makeText(getContext(), "Greška pri čitanju QR koda.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void sendInvite(FriendData friend) {
+        FirebaseUser me = FirebaseAuth.getInstance().getCurrentUser();
+        if (me == null) return;
+
+        String gameType      = GameActivity.GAME_MECH;
+        String myDisplayName = me.getDisplayName() != null ? me.getDisplayName() : "";
+
+        MatchmakingManager mm = new MatchmakingManager(gameType, myDisplayName, me.getUid(),
+                new MatchmakingManager.MatchmakingListener() {
+                    @Override public void onMatchFound(String roomId, int playerNumber) {}
+                    @Override public void onWaiting() {}
+                    @Override public void onError(String msg) {}
+                });
+
+        String roomId = mm.createDirectRoom(null);
+        if (roomId == null) {
             Toast.makeText(getContext(), "Greška pri kreiranju sobe.", Toast.LENGTH_SHORT).show();
+            return;
         }
+        sentRoomId   = roomId;
+        sentGameType = gameType;
+
+        vm.sendGameInvite(friend.getUid(), friend.getUsername(), gameType, roomId)
+                .observe(getViewLifecycleOwner(), inviteId -> {
+                    if (inviteId == null) {
+                        Toast.makeText(getContext(), "Greška pri slanju poziva.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    sentInviteId = inviteId;
+                    showInviteSentDialog(friend, gameType, inviteId, roomId, myDisplayName);
+                });
     }
 
-    private void prikaziCekanjeDijalog(FriendData friend, MatchmakingManager manager) {
-        AlertDialog progressDialog = new AlertDialog.Builder(requireContext())
-                .setTitle("Pozivnica poslata")
-                .setMessage("Čeka se da " + friend.getUsername() + " prihvati izazov...")
+    private void showInviteSentDialog(FriendData friend, String gameType,
+                                      String inviteId, String roomId, String myDisplayName) {
+        inviteSentDialog = new AlertDialog.Builder(requireContext())
+                .setTitle("Poziv poslat")
+                .setMessage("Čekam odgovor od " + friend.getUsername() + "…")
                 .setCancelable(false)
-                .setNegativeButton("Otkaži", (dialog, which) -> {
-                    if (currentInviteRef != null) currentInviteRef.removeValue();
-                    manager.cancelSearch();
-                    if (inviteResponseListener != null && currentInviteRef != null) {
-                        currentInviteRef.removeEventListener(inviteResponseListener);
-                    }
-                }).create();
+                .setNegativeButton("Otkaži poziv", (d, w) -> {
+                    vm.updateInviteStatus(inviteId, GameInvite.STATUS_CANCELLED);
+                    vm.cleanupInvite(inviteId);
+                    vm.cleanupRoom(gameType, roomId);
+                    sentInviteId = null;
+                })
+                .show();
 
-        progressDialog.show();
-
-        inviteResponseListener = new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (!snapshot.exists()) return;
-
-                String status = snapshot.child("status").getValue(String.class);
-                if ("rejected".equals(status)) {
+        vm.watchInviteStatus(inviteId).observe(getViewLifecycleOwner(), status -> {
+            if (status == null) {
+                if (inviteSentDialog != null && inviteSentDialog.isShowing()) {
+                    dismissSentDialog();
+                    vm.cleanupRoom(gameType, roomId);
                     Toast.makeText(getContext(), friend.getUsername() + " je odbio poziv.", Toast.LENGTH_SHORT).show();
-                    progressDialog.dismiss();
-                    if (currentInviteRef != null) {
-                        currentInviteRef.removeValue();
-                        currentInviteRef.removeEventListener(this);
-                    }
                 }
-                if ("accepted".equals(status)) {
-                    progressDialog.dismiss();
-                }
+                return;
             }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
-        };
-
-        currentInviteRef.addValueEventListener(inviteResponseListener);
+            switch (status) {
+                case GameInvite.STATUS_ACCEPTED:
+                    dismissSentDialog();
+                    launchGame(roomId, myDisplayName);
+                    vm.cleanupInvite(inviteId);
+                    break;
+                case GameInvite.STATUS_DECLINED:
+                    dismissSentDialog();
+                    Toast.makeText(getContext(), friend.getUsername() + " je odbio poziv.", Toast.LENGTH_SHORT).show();
+                    vm.cleanupInvite(inviteId);
+                    vm.cleanupRoom(gameType, roomId);
+                    break;
+                case GameInvite.STATUS_CANCELLED:
+                    dismissSentDialog();
+                    break;
+            }
+        });
     }
 
-    private void pokreniIgru(String roomId, String gameType, int playerNumber) {
-        if (inviteResponseListener != null && currentInviteRef != null) {
-            currentInviteRef.removeEventListener(inviteResponseListener);
-            currentInviteRef.removeValue();
-        }
+    private void dismissSentDialog() {
+        if (inviteSentDialog != null && inviteSentDialog.isShowing()) inviteSentDialog.dismiss();
+        inviteSentDialog = null;
+        sentInviteId     = null;
+    }
 
+    private void launchGame(String roomId, String playerName) {
         Intent intent = new Intent(getActivity(), GameActivity.class);
-        intent.putExtra("ROOM_ID", roomId);
-        intent.putExtra("GAME_TYPE", gameType);
-        intent.putExtra("PLAYER_NUMBER", playerNumber);
+        intent.putExtra(GameActivity.EXTRA_ROOM_ID,    roomId);
+        intent.putExtra(GameActivity.EXTRA_PLAYER_NUM, 1);
+        intent.putExtra(GameActivity.EXTRA_PLAYER_NAME, playerName);
         startActivity(intent);
     }
 
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (inviteResponseListener != null && currentInviteRef != null) {
-            currentInviteRef.removeEventListener(inviteResponseListener);
-        }
+    public void onDestroyView() {
+        super.onDestroyView();
+        dismissSentDialog();
+        binding = null;
     }
 }

@@ -14,6 +14,7 @@ public class SpojniceManager {
         void onTurnStarted(int round, int totalRounds, int activePlayer, long turnEndsAt,
                            List<String> leftItems, List<String> shuffledRights, List<String> correctRights,
                            String description, Map<Integer, Integer> resolvedThisRound,
+                           Set<Integer> failedByP1, Set<Integer> lostByP2,
                            int p1Score, int p2Score);
 
         void onGameFinished(int p1Score, int p2Score, String forfeitBy);
@@ -28,14 +29,14 @@ public class SpojniceManager {
     private boolean gameReadyFired = false;
 
     private int totalRounds = 0;
-    private final List<List<String>> leftItemsPerRound    = new ArrayList<>();
+    private final List<List<String>> leftItemsPerRound      = new ArrayList<>();
     private final List<List<String>> shuffledRightsPerRound = new ArrayList<>();
     private final List<List<String>> correctRightsPerRound  = new ArrayList<>();
     private final List<String>       descriptionsPerRound   = new ArrayList<>();
 
     private int lastRound        = -1;
     private int lastActivePlayer = -1;
-    private Map<Integer, Integer> lastResolvedSize = new HashMap<>();
+    private Map<Integer, Integer> lastAttemptedSize = new HashMap<>();
 
     public SpojniceManager(String roomId, int myPlayerNumber, SpojniceListener listener) {
         this.roomRef = FirebaseDatabase.getInstance().getReference()
@@ -76,7 +77,6 @@ public class SpojniceManager {
                 if (!"playing".equals(status)) return;
 
                 if (!gameReadyFired) {
-                    // Coordinator sets turnEndsAt when Spojnice actually starts (not at matchmaking time)
                     if (myPlayerNumber == 1) {
                         Long existingEndsAt = gameSnap.child("turnEndsAt").getValue(Long.class);
                         if (existingEndsAt == null || existingEndsAt <= System.currentTimeMillis()) {
@@ -110,13 +110,26 @@ public class SpojniceManager {
                     } catch (NumberFormatException ignored) {}
                 }
 
-                int currentResSize = resolvedThisRound.size();
-                Integer lastSize = lastResolvedSize.get(round);
+                Set<Integer> failedThisRound = new HashSet<>();
+                for (DataSnapshot entry : gameSnap.child("failed").child(String.valueOf(round)).getChildren()) {
+                    try { failedThisRound.add(Integer.parseInt(entry.getKey())); }
+                    catch (NumberFormatException ignored) {}
+                }
 
-                if (round != lastRound || activePlayer != lastActivePlayer || lastSize == null || currentResSize != lastSize) {
+                Set<Integer> lostThisRound = new HashSet<>();
+                for (DataSnapshot entry : gameSnap.child("lost").child(String.valueOf(round)).getChildren()) {
+                    try { lostThisRound.add(Integer.parseInt(entry.getKey())); }
+                    catch (NumberFormatException ignored) {}
+                }
+
+                // Trigger UI update whenever any of the three sets change size
+                int currentAttemptedSize = resolvedThisRound.size() + failedThisRound.size() + lostThisRound.size();
+                Integer lastSize = lastAttemptedSize.get(round);
+
+                if (round != lastRound || activePlayer != lastActivePlayer || lastSize == null || currentAttemptedSize != lastSize) {
                     lastRound = round;
                     lastActivePlayer = activePlayer;
-                    lastResolvedSize.put(round, currentResSize);
+                    lastAttemptedSize.put(round, currentAttemptedSize);
 
                     Long turnEndsAt = gameSnap.child("turnEndsAt").getValue(Long.class);
                     int p1Score = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
@@ -130,7 +143,10 @@ public class SpojniceManager {
                                 shuffledRightsPerRound.get(round),
                                 correctRightsPerRound.get(round),
                                 descriptionsPerRound.get(round),
-                                resolvedThisRound, p1Score, p2Score);
+                                resolvedThisRound,
+                                failedThisRound,
+                                lostThisRound,
+                                p1Score, p2Score);
                     }
                 }
             }
@@ -143,14 +159,15 @@ public class SpojniceManager {
         roomRef.addValueEventListener(roomListener);
     }
 
-    // KOREKCIJA: Atomska verifikacija spajanja u realnom vremenu na Firebase-u
     public void submitMatchAtomic(final int playerNum, final int round, final int leftIdx, final boolean isCorrect, final int totalPairCount) {
         if (isGameOver) return;
         roomRef.runTransaction(new Transaction.Handler() {
             @NonNull
             @Override
             public Transaction.Result doTransaction(@NonNull MutableData data) {
-                if (data.child("spojnice/resolved").child(String.valueOf(round)).child(String.valueOf(leftIdx)).getValue() != null) {
+                // Abort if already resolved or permanently lost
+                if (data.child("spojnice/resolved").child(String.valueOf(round)).child(String.valueOf(leftIdx)).getValue() != null ||
+                    data.child("spojnice/lost").child(String.valueOf(round)).child(String.valueOf(leftIdx)).getValue() != null) {
                     return Transaction.abort();
                 }
 
@@ -163,11 +180,12 @@ public class SpojniceManager {
                     data.child("scores/player" + playerNum).setValue((currentScore != null ? currentScore : 0) + 2);
 
                     long resolvedCount = data.child("spojnice/resolved").child(String.valueOf(round)).getChildrenCount();
-                    if (resolvedCount >= totalPairCount) {
+                    long lostCount     = data.child("spojnice/lost").child(String.valueOf(round)).getChildrenCount();
+                    if (resolvedCount + lostCount >= totalPairCount) {
                         advanceRoundOrFinish(data, round, now);
                     }
                 } else {
-                    handleTurnTimeoutOrWrong(data, round, playerNum, totalPairCount, now);
+                    handleTurnTimeoutOrWrong(data, round, playerNum, leftIdx, totalPairCount, now);
                 }
 
                 return Transaction.success(data);
@@ -178,23 +196,82 @@ public class SpojniceManager {
         });
     }
 
-    public void handleTurnTimeoutOrWrong(MutableData data, int round, int playerNum, int totalPairCount, long now) {
+    public void handleTurnTimeoutOrWrong(MutableData data, int round, int playerNum, int leftIdx, int totalPairCount, long now) {
         int startingPlayerForRound = (round % 2) + 1;
-        boolean isStartingPlayer = (playerNum == startingPlayerForRound);
+        boolean isStartingPlayer   = (playerNum == startingPlayerForRound);
 
         long resolvedCount = data.child("spojnice/resolved").child(String.valueOf(round)).getChildrenCount();
+        long lostCount     = data.child("spojnice/lost").child(String.valueOf(round)).getChildrenCount();
 
-        if (resolvedCount >= totalPairCount) {
+        if (resolvedCount + lostCount >= totalPairCount) {
             advanceRoundOrFinish(data, round, now);
             return;
         }
 
         if (isStartingPlayer) {
-            int nextPlayer = 3 - playerNum;
-            data.child("spojnice/currentPlayer").setValue(nextPlayer);
-            data.child("spojnice/turnEndsAt").setValue(now + 30_000L);
+            // Player 1 wrong / timeout — mark failed, keep Player 1 active
+            if (leftIdx >= 0) {
+                if (data.child("spojnice/resolved").child(String.valueOf(round)).child(String.valueOf(leftIdx)).getValue() == null) {
+                    data.child("spojnice/failed").child(String.valueOf(round)).child(String.valueOf(leftIdx)).setValue(true);
+                }
+            } else {
+                // Timeout: mark every unattempted item as failed
+                Set<String> alreadyHandled = new HashSet<>();
+                for (MutableData s : data.child("spojnice/resolved").child(String.valueOf(round)).getChildren()) {
+                    alreadyHandled.add(s.getKey());
+                }
+                for (MutableData s : data.child("spojnice/failed").child(String.valueOf(round)).getChildren()) {
+                    alreadyHandled.add(s.getKey());
+                }
+                for (int i = 0; i < totalPairCount; i++) {
+                    if (!alreadyHandled.contains(String.valueOf(i))) {
+                        data.child("spojnice/failed").child(String.valueOf(round)).child(String.valueOf(i)).setValue(true);
+                    }
+                }
+            }
+
+            long failedCount = data.child("spojnice/failed").child(String.valueOf(round)).getChildrenCount();
+
+            if (resolvedCount + failedCount >= totalPairCount) {
+                // Player 1 attempted everything
+                if (failedCount > 0) {
+                    int nextPlayer = 3 - playerNum;
+                    data.child("spojnice/currentPlayer").setValue(nextPlayer);
+                    data.child("spojnice/turnEndsAt").setValue(now + 30_000L);
+                } else {
+                    advanceRoundOrFinish(data, round, now);
+                }
+            }
+            // else: Player 1 still has unattempted items — leave currentPlayer unchanged
+
         } else {
-            advanceRoundOrFinish(data, round, now);
+            // Player 2 wrong / timeout — mark lost, Player 2 continues with remaining items
+            if (leftIdx >= 0) {
+                data.child("spojnice/lost").child(String.valueOf(round)).child(String.valueOf(leftIdx)).setValue(true);
+
+                long newLostCount = data.child("spojnice/lost").child(String.valueOf(round)).getChildrenCount();
+                if (resolvedCount + newLostCount >= totalPairCount) {
+                    advanceRoundOrFinish(data, round, now);
+                }
+                // else: Player 2 still has more failed items to try
+
+            } else {
+                // Timeout for Player 2: mark every remaining failed-but-unhandled item as lost
+                Set<String> alreadyDone = new HashSet<>();
+                for (MutableData s : data.child("spojnice/resolved").child(String.valueOf(round)).getChildren()) {
+                    alreadyDone.add(s.getKey());
+                }
+                for (MutableData s : data.child("spojnice/lost").child(String.valueOf(round)).getChildren()) {
+                    alreadyDone.add(s.getKey());
+                }
+                for (MutableData s : data.child("spojnice/failed").child(String.valueOf(round)).getChildren()) {
+                    String key = s.getKey();
+                    if (!alreadyDone.contains(key)) {
+                        data.child("spojnice/lost").child(String.valueOf(round)).child(key).setValue(true);
+                    }
+                }
+                advanceRoundOrFinish(data, round, now);
+            }
         }
     }
 
@@ -227,10 +304,10 @@ public class SpojniceManager {
         descriptionsPerRound.clear();
 
         for (int i = 0; i < totalRounds; i++) {
-            DataSnapshot g    = snapshot.child("games").child(String.valueOf(i));
-            String desc       = g.child("description").getValue(String.class);
-            Long pairCountL   = g.child("pairCount").getValue(Long.class);
-            int pairCount     = pairCountL != null ? pairCountL.intValue() : 0;
+            DataSnapshot g  = snapshot.child("games").child(String.valueOf(i));
+            String desc     = g.child("description").getValue(String.class);
+            Long pairCountL = g.child("pairCount").getValue(Long.class);
+            int pairCount   = pairCountL != null ? pairCountL.intValue() : 0;
 
             List<String> lefts    = new ArrayList<>();
             List<String> shuffled = new ArrayList<>();
@@ -256,7 +333,7 @@ public class SpojniceManager {
             @NonNull
             @Override
             public Transaction.Result doTransaction(@NonNull MutableData data) {
-                handleTurnTimeoutOrWrong(data, round, playerNum, totalPairCount, now);
+                handleTurnTimeoutOrWrong(data, round, playerNum, -1, totalPairCount, now);
                 return Transaction.success(data);
             }
 
@@ -265,6 +342,6 @@ public class SpojniceManager {
         });
     }
 
-    private int    toInt(Long v)     { return v != null ? v.intValue() : 0; }
-    private String str (String v)    { return v != null ? v : ""; }
+    private int    toInt(Long v)  { return v != null ? v.intValue() : 0; }
+    private String str (String v) { return v != null ? v : ""; }
 }
