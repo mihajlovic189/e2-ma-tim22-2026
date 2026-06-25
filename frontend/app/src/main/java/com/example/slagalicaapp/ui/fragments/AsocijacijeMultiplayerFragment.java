@@ -19,8 +19,10 @@ import androidx.fragment.app.Fragment;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.firebase.AsocijacijeManager;
 import com.example.slagalicaapp.databinding.FragmentAsocijacijeBinding;
+import com.example.slagalicaapp.game.asocijacije.Asocijacija;
 import com.example.slagalicaapp.game.asocijacije.AsocijacijeBoard;
 import com.example.slagalicaapp.game.asocijacije.AsocijacijeGuessResult;
+import com.example.slagalicaapp.game.asocijacije.AsocijacijeRepository;
 import com.example.slagalicaapp.ui.header.GameHeaderController;
 
 import java.util.HashMap;
@@ -69,6 +71,10 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
     private String p2PlayerName = "Igrač 2";
     private long   gameEndsAt   = 0;
 
+    private boolean isStandaloneMode = false;
+    private int standaloneScore = 0;
+    private int cumulativePoints = 0;
+
     // Timers
     private CountDownTimer guessTimer;
     private boolean mainTimerPaused = false;
@@ -87,8 +93,9 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
 
         Bundle args = getArguments();
         if (args != null) {
-            roomId         = args.getString("roomId");
-            myPlayerNumber = args.getInt("playerNumber", 1);
+            roomId           = args.getString("roomId");
+            myPlayerNumber   = args.getInt("playerNumber", 1);
+            cumulativePoints = args.getInt("cumulativePoints", 0);
         }
         isCoordinator = (myPlayerNumber == 1);
 
@@ -101,8 +108,13 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
 
         disableAllInput();
 
-        manager = new AsocijacijeManager(roomId, this);
-        manager.startListening();
+        if (roomId == null) {
+            isStandaloneMode = true;
+            setupStandaloneGame();
+        } else {
+            manager = new AsocijacijeManager(roomId, myPlayerNumber, this);
+            manager.startListening();
+        }
     }
 
     // ─── AsocijacijeListener ────────────────────────────────────────────────
@@ -112,6 +124,12 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
                             String[][] boardFields, String[] colSols, String finalSol,
                             long gameEndsAtParam) {
         requireActivity().runOnUiThread(() -> {
+            // Reset per-round board state for a clean slate each round
+            openedFieldKeys = new HashSet<>();
+            columnsSolvedBy = new HashMap<>();
+            finalSolvedBy   = 0;
+            clearEditTextsForNewRound();
+
             fields          = boardFields;
             columnSolutions = colSols;
             finalSolution   = finalSol;
@@ -126,7 +144,7 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
             if (headerController != null) headerController.release();
             headerController = new GameHeaderController(binding.getRoot(), remaining);
             headerController.setPlayerNames(p1Name, p2Name);
-            headerController.setScores(0, 0);
+            headerController.setScores(isStandaloneMode ? cumulativePoints : 0, 0);
             headerController.setOnTimerFinishedListener(this::onGameTimerExpired);
             headerController.start();
         });
@@ -186,6 +204,7 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
             Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
 
             Bundle result = new Bundle();
+            result.putInt("points", isStandaloneMode ? standaloneScore : 0);
             result.putBoolean("finished", true);
             getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
         });
@@ -202,7 +221,9 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
     private void onGameTimerExpired() {
         if (isGameOver) return;
         disableAllInput();
-        if (isCoordinator) {
+        if (isStandaloneMode) {
+            onGameFinished(standaloneScore, 0, null);
+        } else if (isCoordinator) {
             String winner = p1Score > p2Score ? "player1"
                           : p2Score > p1Score ? "player2" : "draw";
             Map<String, Object> upd = new HashMap<>();
@@ -282,6 +303,14 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
     private void onGuessTimerExpired() {
         if (!iAmActive || isGameOver) return;
         freezeInput();
+        if (isStandaloneMode) {
+            currentTurnPhase = "opening";
+            iAmActive = true;
+            inputFrozen = false;
+            if (mainTimerPaused) resumeMainTimer();
+            updateInputEnabled();
+            return;
+        }
         Map<String, Object> upd = new HashMap<>();
         upd.put("activePlayer", 3 - myPlayerNumber);
 
@@ -308,13 +337,22 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
 
         freezeInput();
         revealFieldButton(fieldButtons[col][row], fields[col][row]);
+        openedFieldKeys.add(key);
 
-        Map<String, Object> upd = new HashMap<>();
-        upd.put("openedFields/" + key, true);
-        upd.put("turnPhase",  "guessing");
-        upd.put("turnEndsAt", System.currentTimeMillis() + GUESS_DURATION_MS);
-        // activePlayer does NOT change — player keeps the turn
-        manager.commitAction(upd);
+        if (isStandaloneMode) {
+            currentTurnPhase = "guessing";
+            currentTurnEndsAt = System.currentTimeMillis() + GUESS_DURATION_MS;
+            iAmActive = true;
+            inputFrozen = false;
+            updateInputEnabled();
+            startGuessTimer(GUESS_DURATION_MS);
+        } else {
+            Map<String, Object> upd = new HashMap<>();
+            upd.put("openedFields/" + key, true);
+            upd.put("turnPhase",  "guessing");
+            upd.put("turnEndsAt", System.currentTimeMillis() + GUESS_DURATION_MS);
+            manager.commitAction(upd);
+        }
     }
 
     // ─── Column guess ────────────────────────────────────────────────────────
@@ -330,7 +368,24 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
         freezeInput();
         getEditTextForColumn(col).setText("");
 
-        manager.submitColumnGuessAtomic(myPlayerNumber, colLetter, attempt, columnSolutions[col], GUESS_DURATION_MS);
+        if (isStandaloneMode) {
+            boolean correct = attempt.trim().equalsIgnoreCase(columnSolutions[col].trim());
+            if (correct) {
+                columnsSolvedBy.put(colLetter, 1);
+                standaloneScore += 10;
+                for (int row = 0; row < 4; row++) openedFieldKeys.add(fieldKey(col, row));
+                onColumnSolvedUI(col);
+                if (headerController != null) headerController.setScores(cumulativePoints + standaloneScore, 0);
+            }
+            cancelGuessTimer();
+            if (mainTimerPaused) resumeMainTimer();
+            currentTurnPhase = "opening";
+            iAmActive = true;
+            inputFrozen = false;
+            updateInputEnabled();
+        } else {
+            manager.submitColumnGuessAtomic(myPlayerNumber, colLetter, attempt, columnSolutions[col], GUESS_DURATION_MS);
+        }
     }
 
     // ─── Final guess ─────────────────────────────────────────────────────────
@@ -342,10 +397,24 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
         if (finalSolvedBy > 0) return;
 
         freezeInput();
-        binding.etFinalSolution.setText(""); // odmah očisti lokalni unos
+        binding.etFinalSolution.setText("");
 
-        // Šaljemo na atomsku proveru i kaskadno bodovanje
-        manager.submitFinalGuessAtomic(myPlayerNumber, attempt, finalSolution, GUESS_DURATION_MS);
+        if (isStandaloneMode) {
+            boolean correct = attempt.trim().equalsIgnoreCase(finalSolution.trim());
+            if (correct) {
+                standaloneScore += 20;
+                finalSolvedBy = 1;
+                binding.etFinalSolution.setText(finalSolution);
+                if (headerController != null) headerController.setScores(cumulativePoints + standaloneScore, 0);
+                onGameFinished(standaloneScore, 0, null);
+            } else {
+                iAmActive = true;
+                inputFrozen = false;
+                updateInputEnabled();
+            }
+        } else {
+            manager.submitFinalGuessAtomic(myPlayerNumber, attempt, finalSolution, GUESS_DURATION_MS);
+        }
     }
 
     // ─── Board reconstruction for local evaluation ───────────────────────────
@@ -373,8 +442,34 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
 
     // ─── UI rendering ────────────────────────────────────────────────────────
 
+    private void clearEditTextsForNewRound() {
+        if (binding == null) return;
+        for (int col = 0; col < 4; col++) {
+            EditText et = getEditTextForColumn(col);
+            et.setText("");
+            et.setBackgroundTintList(ColorStateList.valueOf(0xFFF0F0F0));
+        }
+        binding.etFinalSolution.setText("");
+        binding.etFinalSolution.setBackgroundTintList(ColorStateList.valueOf(0xFF81D4FA));
+    }
+
     private void renderBoardState() {
         if (fields == null) return;
+
+        // Reset all field buttons to closed state before re-revealing.
+        // Safe to do every render: Android batches view updates within one frame,
+        // so the intermediate "all closed" state is never drawn on screen.
+        for (int col = 0; col < 4; col++) {
+            String letter = String.valueOf((char)('A' + col));
+            for (int row = 0; row < 4; row++) {
+                Button btn = fieldButtons[col][row];
+                if (btn != null) {
+                    btn.setText(letter + (row + 1));
+                    btn.setTextColor(0xFFFFFFFF);
+                    btn.setBackgroundTintList(null);
+                }
+            }
+        }
 
         for (String key : openedFieldKeys) {
             int col = colIndex(key.charAt(0));
@@ -531,6 +626,33 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
 
     private void showToast(String msg) {
         if (getContext() != null) Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+    }
+
+    private void setupStandaloneGame() {
+        Asocijacija a = AsocijacijeRepository.getNasumicnaAsocijacija();
+        String[][] boardFields = new String[4][4];
+        String[] colSols = new String[4];
+        String[] cols = {"A", "B", "C", "D"};
+        for (int c = 0; c < 4; c++) {
+            colSols[c] = a.resenjaKolona.get(cols[c]);
+            for (int r = 0; r < 4; r++) {
+                boardFields[c][r] = a.polja.get(cols[c] + (r + 1));
+            }
+        }
+        String finalSol = a.konacnoResenje;
+        long endsAt = System.currentTimeMillis() + GAME_DURATION_MS;
+
+        myPlayerNumber = 1;
+        isCoordinator = true;
+        iAmActive = true;
+        currentTurnPhase = "opening";
+
+        onGameReady("Ti", "—", boardFields, colSols, finalSol, endsAt);
+        if (headerController != null) {
+            headerController.setOnTimerFinishedListener(this::onGameTimerExpired);
+            headerController.start();
+        }
+        updateInputEnabled();
     }
 
     @Override

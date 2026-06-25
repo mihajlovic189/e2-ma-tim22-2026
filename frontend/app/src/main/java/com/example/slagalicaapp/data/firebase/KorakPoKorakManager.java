@@ -19,6 +19,7 @@ public class KorakPoKorakManager {
     private final int myPlayerNumber;
     private final KorakListener listener;
     private ValueEventListener roomListener;
+    private int trackedRound = 1;
 
     public KorakPoKorakManager(String roomId, int myPlayerNumber, KorakListener listener) {
         // KOREKCIJA: Usmereno na krovni čvor meča GAME_MECH ("SLAGALICA_MECH")
@@ -49,19 +50,22 @@ public class KorakPoKorakManager {
                     return;
                 }
 
-                int round = toInt(snapshot.child("currentRound").getValue(Long.class));
-                int activePlayer = toInt(snapshot.child("activePlayer").getValue(Long.class));
-                int step = toInt(snapshot.child("currentStep").getValue(Long.class));
-                String roundStatus = snapshot.child("roundStatus").getValue(String.class);
+                DataSnapshot gameSnap = snapshot.child("korakPoKorak");
+
+                int round = toInt(gameSnap.child("currentRound").getValue(Long.class));
+                trackedRound = round;
+                int activePlayer = toInt(gameSnap.child("activePlayer").getValue(Long.class));
+                int step = toInt(gameSnap.child("currentStep").getValue(Long.class));
+                String roundStatus = gameSnap.child("roundStatus").getValue(String.class);
                 if (roundStatus == null) roundStatus = "";
-                Boolean solvedFlag = snapshot.child("lastRoundSolved").getValue(Boolean.class);
+                Boolean solvedFlag = gameSnap.child("lastRoundSolved").getValue(Boolean.class);
                 boolean solved = solvedFlag != null && solvedFlag;
 
                 if (round > lastRound) {
-                    String solution = snapshot.child("rounds")
+                    String solution = gameSnap.child("rounds")
                             .child(String.valueOf(round)).child("solution")
                             .getValue(String.class);
-                    java.util.List<String> steps = readSteps(snapshot, round);
+                    java.util.List<String> steps = readSteps(gameSnap, round);
                     if (!isRoundReady(solution, steps)) return;
 
                     lastRound = round;
@@ -87,7 +91,7 @@ public class KorakPoKorakManager {
 
                 if ("round_finished".equals(roundStatus) && !lastRoundStatus.equals("round_finished")) {
                     lastRoundStatus = roundStatus;
-                    boolean hasNext = round < 2; // Može se menjati u zavisnosti od broja željenih rundi
+                    boolean hasNext = round < 2;
                     listener.onRoundFinished(p1, p2, hasNext, solved);
                 }
 
@@ -105,12 +109,12 @@ public class KorakPoKorakManager {
     }
 
     public void revealNextStep(int stepIndex) {
-        roomRef.child("currentStep").setValue(stepIndex);
+        roomRef.child("korakPoKorak/currentStep").setValue(stepIndex);
     }
 
     public void advanceStepIfNeeded(int stepIndex) {
         if (stepIndex < 0 || stepIndex >= 7) return;
-        roomRef.child("currentStep").runTransaction(new Transaction.Handler() {
+        roomRef.child("korakPoKorak/currentStep").runTransaction(new Transaction.Handler() {
             @Override
             public Transaction.Result doTransaction(MutableData data) {
                 Long current = data.getValue(Long.class);
@@ -131,8 +135,8 @@ public class KorakPoKorakManager {
 
         if (!correct) {
             Map<String, Object> update = new HashMap<>();
-            update.put("lastWrongAnswer", answer);
-            update.put("lastWrongBy", "player" + myPlayerNumber);
+            update.put("korakPoKorak/lastWrongAnswer", answer);
+            update.put("korakPoKorak/lastWrongBy", "player" + myPlayerNumber);
             roomRef.updateChildren(update);
             if (isOpponentChance) {
                 endRoundWithoutAnswer();
@@ -141,11 +145,10 @@ public class KorakPoKorakManager {
         }
 
         Map<String, Object> solvedUpdate = new HashMap<>();
-        solvedUpdate.put("lastRoundSolved", true);
-        solvedUpdate.put("lastSolvedBy", "player" + myPlayerNumber);
+        solvedUpdate.put("korakPoKorak/lastRoundSolved", true);
+        solvedUpdate.put("korakPoKorak/lastSolvedBy", "player" + myPlayerNumber);
         roomRef.updateChildren(solvedUpdate);
 
-        // Računanje bodova: 20 - (korak * 2), ako je protivnikova šansa fiksno 5 bodova
         int points = !isOpponentChance ? Math.max(0, 20 - (currentStep * 2)) : 5;
         String scorePath = "player" + myPlayerNumber;
 
@@ -164,28 +167,15 @@ public class KorakPoKorakManager {
                     @Override
                     public void onComplete(DatabaseError e, boolean committed, DataSnapshot s) {
                         if (!committed) return;
-
-                        roomRef.child("currentRound").addListenerForSingleValueEvent(
-                                new ValueEventListener() {
-                                    @Override
-                                    public void onDataChange(DataSnapshot snap) {
-                                        Long round = snap.getValue(Long.class);
-                                        if (round != null && round >= 2) {
-                                            roomRef.child("roundStatus").setValue("game_finished");
-                                        } else {
-                                            roomRef.child("roundStatus").setValue("round_finished");
-                                        }
-                                    }
-                                    @Override public void onCancelled(DatabaseError e) {}
-                                }
-                        );
+                        String nextStatus = trackedRound >= 2 ? "game_finished" : "round_finished";
+                        roomRef.child("korakPoKorak/roundStatus").setValue(nextStatus);
                     }
                 });
     }
 
     public void onTimerExpired(boolean alreadyOpponentChance) {
         if (!alreadyOpponentChance) {
-            roomRef.child("roundStatus").setValue("opponent_chance");
+            roomRef.child("korakPoKorak/roundStatus").setValue("opponent_chance");
         } else {
             endRoundWithoutAnswer();
         }
@@ -195,22 +185,21 @@ public class KorakPoKorakManager {
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
-                Long roundVal = snapshot.child("currentRound").getValue(Long.class);
-                String roundStatus = snapshot.child("roundStatus").getValue(String.class);
+                Long roundVal = snapshot.child("korakPoKorak/currentRound").getValue(Long.class);
+                String roundStatus = snapshot.child("korakPoKorak/roundStatus").getValue(String.class);
                 if (roundVal == null || roundVal >= 2) return;
                 if (!"round_finished".equals(roundStatus)) return;
 
-                // KOREKCIJA: Dinamičko postavljanje sledeće runde na osnovu trenutne + 1
                 long sledecaRunda = roundVal + 1;
 
                 Map<String, Object> update = new HashMap<>();
-                update.put("currentRound", sledecaRunda);
-                update.put("activePlayer", nextActivePlayer);
-                update.put("currentStep", 0);
-                update.put("roundStatus", "playing");
-                update.put("lastWrongAnswer", null);
-                update.put("lastRoundSolved", null);
-                update.put("lastSolvedBy", null);
+                update.put("korakPoKorak/currentRound", sledecaRunda);
+                update.put("korakPoKorak/activePlayer", nextActivePlayer);
+                update.put("korakPoKorak/currentStep", 0);
+                update.put("korakPoKorak/roundStatus", "playing");
+                update.put("korakPoKorak/lastWrongAnswer", null);
+                update.put("korakPoKorak/lastRoundSolved", null);
+                update.put("korakPoKorak/lastSolvedBy", null);
                 roomRef.updateChildren(update);
             }
 
@@ -220,23 +209,12 @@ public class KorakPoKorakManager {
     }
 
     private void endRoundWithoutAnswer() {
+        String nextStatus = trackedRound >= 2 ? "game_finished" : "round_finished";
         Map<String, Object> update = new HashMap<>();
-        update.put("lastRoundSolved", false);
-        update.put("lastSolvedBy", null);
+        update.put("korakPoKorak/lastRoundSolved", false);
+        update.put("korakPoKorak/lastSolvedBy", null);
+        update.put("korakPoKorak/roundStatus", nextStatus);
         roomRef.updateChildren(update);
-
-        roomRef.child("currentRound").addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                Long round = snapshot.getValue(Long.class);
-                if (round != null && round >= 2) {
-                    roomRef.child("roundStatus").setValue("game_finished");
-                } else {
-                    roomRef.child("roundStatus").setValue("round_finished");
-                }
-            }
-            @Override public void onCancelled(DatabaseError e) {}
-        });
     }
 
     public void stopListening() {

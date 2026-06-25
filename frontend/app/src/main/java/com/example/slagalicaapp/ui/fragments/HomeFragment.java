@@ -18,8 +18,8 @@ import com.example.slagalicaapp.databinding.FragmentHomeBinding;
 import com.example.slagalicaapp.ui.activities.GameActivity;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.example.slagalicaapp.viewmodels.AuthViewModel;
 
 public class HomeFragment extends Fragment {
@@ -51,7 +51,6 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
-        // Jedno glavno dugme za pokretanje cele partije (svih 6 igara u nizu)
         binding.btnStartGame.setOnClickListener(v -> {
             binding.btnStartGame.setEnabled(false);
             startWholeGameMatchmaking();
@@ -72,6 +71,18 @@ public class HomeFragment extends Fragment {
         binding.btnRegionMap.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new RegionMapFragment())
+                        .addToBackStack(null)
+                        .commit());
+
+        binding.btnRegionalChat.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new RegionalChatFragment())
+                        .addToBackStack(null)
+                        .commit());
+
+        binding.btnRegionalChallenges.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new ChallengesFragment())
                         .addToBackStack(null)
                         .commit());
 
@@ -101,8 +112,9 @@ public class HomeFragment extends Fragment {
         String playerUid = user.getUid();
         final String finalPlayerName = playerName;
 
-        DatabaseReference userTokensRef = FirebaseDatabase.getInstance().getReference("users").child(playerUid).child("tokens");
-        userTokensRef.setValue(currentTokens - 1).addOnSuccessListener(unused -> {
+        FirebaseFirestore.getInstance().collection("users").document(playerUid)
+                .update("tokenCount", FieldValue.increment(-1))
+                .addOnSuccessListener(unused -> {
 
             Toast.makeText(getContext(), "Žeton iskorišćen! Traženje protivnika za partiju...", Toast.LENGTH_SHORT).show();
 

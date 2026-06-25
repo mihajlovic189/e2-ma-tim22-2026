@@ -16,7 +16,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     private final List<ChatMessage> messages = new ArrayList<>();
     private final String currentUserId;
-    private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+    private final SimpleDateFormat timeFormat = new SimpleDateFormat("dd.MM. HH:mm", Locale.getDefault());
 
     public ChatAdapter(String currentUserId) {
         this.currentUserId = currentUserId;

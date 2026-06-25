@@ -4,6 +4,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
 import android.view.*;
 import android.widget.*;
 import androidx.annotation.*;
@@ -50,6 +51,25 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
     private boolean iAmActive = false;
 
     private CountDownTimer countDownTimer;
+    private final Handler handler = new Handler();
+    private boolean isStandaloneMode = false;
+    private int standaloneScore = 0;
+    private int standaloneRoundIndex = 0;
+    private int cumulativePoints = 0;
+    private final Set<Integer> failedLeftIndices = new HashSet<>();
+
+    private static final String[][] STANDALONE_LEFTS = {
+        {"Beograd", "Pariz", "Rim", "Atina"},
+        {"Fudbal", "Košarka", "Tenis", "Plivanje"}
+    };
+    private static final String[][] STANDALONE_RIGHTS = {
+        {"Srbija", "Francuska", "Italija", "Grčka"},
+        {"Gol i lopta", "Koš i lopta", "Reketi", "Bazen"}
+    };
+    private static final String[] STANDALONE_DESC = {
+        "Povežite gradove sa državama",
+        "Povežite sport sa pojmom"
+    };
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -76,12 +96,19 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
 
         Bundle args = getArguments();
         if (args != null) {
-            roomId       = args.getString("roomId");
+            roomId         = args.getString("roomId");
             myPlayerNumber = args.getInt("playerNumber", 1);
+            cumulativePoints = args.getInt("cumulativePoints", 0);
         }
 
-        manager = new SpojniceManager(roomId, this);
-        manager.startListening();
+        if (roomId == null) {
+            isStandaloneMode = true;
+            iAmActive = true;
+            setupStandaloneRound(0);
+        } else {
+            manager = new SpojniceManager(roomId, myPlayerNumber, this);
+            manager.startListening();
+        }
     }
 
     @Override
@@ -239,13 +266,33 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
         selectedLeftIdx = -1;
         leftButtons.get(leftIdx).setBackgroundTintList(null);
 
-        // KOREKCIJA: Provera tačnosti se šalje odmah menadžeru za atomsku obradu
         boolean isCorrect = correctRights.get(leftIdx).equals(shuffledRights.get(rightPos));
 
-        // Isključi input privremeno dok baza ne odgovori
-        disableAllButtons();
-
-        manager.submitMatchAtomic(myPlayerNumber, currentRound, leftIdx, isCorrect, leftItems.size());
+        if (isStandaloneMode) {
+            if (isCorrect) {
+                resolvedThisRound.put(leftIdx, rightPos);
+                usedRightPositions.add(rightPos);
+                standaloneScore += 10;
+                applyTint(leftButtons.get(leftIdx), "#22C55E");
+                applyTint(rightButtons.get(rightPos), "#22C55E");
+                leftButtons.get(leftIdx).setEnabled(false);
+                rightButtons.get(rightPos).setEnabled(false);
+            } else {
+                // Permanently red — this left item is lost
+                failedLeftIndices.add(leftIdx);
+                applyTint(leftButtons.get(leftIdx), "#EF4444");
+                leftButtons.get(leftIdx).setEnabled(false);
+            }
+            tvP1Score.setText(String.valueOf(cumulativePoints + standaloneScore));
+            int done = resolvedThisRound.size() + failedLeftIndices.size();
+            if (done == leftItems.size()) {
+                cancelTimer();
+                handler.postDelayed(this::standaloneAdvanceRound, 1000);
+            }
+        } else {
+            disableAllButtons();
+            manager.submitMatchAtomic(myPlayerNumber, currentRound, leftIdx, isCorrect, leftItems.size());
+        }
     }
 
     private void startTimer(long durationMs) {
@@ -265,7 +312,9 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
             public void onFinish() {
                 if (!isAdded() || isGameOver) return;
                 progressTimer.setProgress(0);
-                if (iAmActive) {
+                if (isStandaloneMode) {
+                    standaloneAdvanceRound();
+                } else if (iAmActive) {
                     disableAllButtons();
                     if (manager != null) {
                         manager.handleTimeoutLocal(currentRound, myPlayerNumber, leftItems.size());
@@ -291,10 +340,52 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
         btn.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor(hex)));
     }
 
+    private void setupStandaloneRound(int roundIdx) {
+        standaloneRoundIndex = roundIdx;
+        leftItems = new ArrayList<>(Arrays.asList(STANDALONE_LEFTS[roundIdx]));
+        correctRights = new ArrayList<>(Arrays.asList(STANDALONE_RIGHTS[roundIdx]));
+        shuffledRights = new ArrayList<>(correctRights);
+        Collections.shuffle(shuffledRights);
+        resolvedThisRound = new HashMap<>();
+        usedRightPositions.clear();
+        failedLeftIndices.clear();
+        selectedLeftIdx = -1;
+        iAmActive = true;
+
+        tvRoundInfo.setText("Runda " + (roundIdx + 1) + " / " + STANDALONE_LEFTS.length);
+        tvDescription.setText(STANDALONE_DESC[roundIdx]);
+        tvCurrentPlayer.setText("Tvoj red je! Poveži pojmove.");
+        tvP1Score.setText(String.valueOf(cumulativePoints + standaloneScore));
+
+        buildBoard();
+        startTimer(TURN_TIME_MS);
+    }
+
+    private void standaloneAdvanceRound() {
+        if (!isAdded() || isGameOver) return;
+        int next = standaloneRoundIndex + 1;
+        if (next >= STANDALONE_LEFTS.length) {
+            standaloneFinishGame();
+        } else {
+            setupStandaloneRound(next);
+        }
+    }
+
+    private void standaloneFinishGame() {
+        isGameOver = true;
+        cancelTimer();
+        disableAllButtons();
+        tvCurrentPlayer.setText("Igra završena! Ukupno: " + standaloneScore + " poena");
+        Bundle result = new Bundle();
+        result.putInt("points", standaloneScore);
+        getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         cancelTimer();
+        handler.removeCallbacksAndMessages(null);
         if (manager != null) manager.stopListening();
     }
 }

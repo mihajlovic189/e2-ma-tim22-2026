@@ -202,10 +202,6 @@ public class MainActivity extends AppCompatActivity {
         if (authStateListener != null) {
             FirebaseAuth.getInstance().removeAuthStateListener(authStateListener);
         }
-        if (backgroundChatListener != null && backgroundChatRef != null) {
-            backgroundChatRef.removeEventListener(backgroundChatListener);
-            backgroundChatListener = null;
-        }
     }
 
     @Override
@@ -213,6 +209,10 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         stopGlobalInviteListener();
         dismissInviteDialog();
+        if (backgroundChatListener != null && backgroundChatRef != null) {
+            backgroundChatRef.removeEventListener(backgroundChatListener);
+            backgroundChatListener = null;
+        }
     }
 
     // ── Global invite listener ────────────────────────────────────────────────
@@ -478,16 +478,9 @@ public class MainActivity extends AppCompatActivity {
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent,
                 PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
 
-        String channelId = "regional_chat_sim";
         NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            android.app.NotificationChannel channel = new android.app.NotificationChannel(
-                    channelId, "Regionalni Čet", NotificationManager.IMPORTANCE_DEFAULT);
-            if (notificationManager != null) notificationManager.createNotificationChannel(channel);
-        }
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, SlagalicaApp.CHANNEL_CHAT)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Nova poruka od: " + naslov)
                 .setContentText(poruka)

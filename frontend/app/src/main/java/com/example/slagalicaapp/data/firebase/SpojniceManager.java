@@ -21,6 +21,7 @@ public class SpojniceManager {
     }
 
     private final DatabaseReference roomRef;
+    private final int myPlayerNumber;
     private final SpojniceListener listener;
     private ValueEventListener roomListener;
     private boolean isGameOver = false;
@@ -36,10 +37,10 @@ public class SpojniceManager {
     private int lastActivePlayer = -1;
     private Map<Integer, Integer> lastResolvedSize = new HashMap<>();
 
-    public SpojniceManager(String roomId, SpojniceListener listener) {
-        // KOREKCIJA: Prilagođeno krovnom čvoru sesije meča
+    public SpojniceManager(String roomId, int myPlayerNumber, SpojniceListener listener) {
         this.roomRef = FirebaseDatabase.getInstance().getReference()
                 .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
+        this.myPlayerNumber = myPlayerNumber;
         this.listener = listener;
     }
 
@@ -52,7 +53,9 @@ public class SpojniceManager {
                 String status = snapshot.child("status").getValue(String.class);
                 if (status == null) return;
 
-                if ("game_finished".equals(status)) {
+                DataSnapshot gameSnap = snapshot.child("spojnice");
+
+                if ("forfeit".equals(status)) {
                     isGameOver = true;
                     stopListening();
                     int p1 = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
@@ -61,25 +64,45 @@ public class SpojniceManager {
                     return;
                 }
 
+                if ("game_finished".equals(gameSnap.child("status").getValue(String.class))) {
+                    isGameOver = true;
+                    stopListening();
+                    int p1 = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
+                    int p2 = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
+                    listener.onGameFinished(p1, p2, null);
+                    return;
+                }
+
                 if (!"playing".equals(status)) return;
 
                 if (!gameReadyFired) {
+                    // Coordinator sets turnEndsAt when Spojnice actually starts (not at matchmaking time)
+                    if (myPlayerNumber == 1) {
+                        Long existingEndsAt = gameSnap.child("turnEndsAt").getValue(Long.class);
+                        if (existingEndsAt == null || existingEndsAt <= System.currentTimeMillis()) {
+                            roomRef.child("spojnice/turnEndsAt").setValue(System.currentTimeMillis() + 30_000L);
+                            return;
+                        }
+                    }
+                    Long endsAtCheck = gameSnap.child("turnEndsAt").getValue(Long.class);
+                    if (endsAtCheck == null || endsAtCheck <= System.currentTimeMillis()) return;
+
                     gameReadyFired = true;
-                    parseGameData(snapshot);
+                    parseGameData(gameSnap);
                     String p1 = snapshot.child("player1").getValue(String.class);
                     String p2 = snapshot.child("player2").getValue(String.class);
                     listener.onGameReady(p1 != null ? p1 : "Igrač 1", p2 != null ? p2 : "Igrač 2");
                 }
 
-                Long roundL  = snapshot.child("currentRound").getValue(Long.class);
-                Long playerL = snapshot.child("currentPlayer").getValue(Long.class);
+                Long roundL  = gameSnap.child("currentRound").getValue(Long.class);
+                Long playerL = gameSnap.child("currentPlayer").getValue(Long.class);
                 if (roundL == null || playerL == null) return;
 
                 int round        = roundL.intValue();
                 int activePlayer = playerL.intValue();
 
                 Map<Integer, Integer> resolvedThisRound = new HashMap<>();
-                for (DataSnapshot entry : snapshot.child("resolved").child(String.valueOf(round)).getChildren()) {
+                for (DataSnapshot entry : gameSnap.child("resolved").child(String.valueOf(round)).getChildren()) {
                     try {
                         int leftIdx = Integer.parseInt(entry.getKey());
                         Long pNum   = entry.getValue(Long.class);
@@ -87,7 +110,6 @@ public class SpojniceManager {
                     } catch (NumberFormatException ignored) {}
                 }
 
-                // Okidamo promenu ako se promenila runda, aktivni igrač ILI ako je dodat novi rešeni par
                 int currentResSize = resolvedThisRound.size();
                 Integer lastSize = lastResolvedSize.get(round);
 
@@ -96,7 +118,7 @@ public class SpojniceManager {
                     lastActivePlayer = activePlayer;
                     lastResolvedSize.put(round, currentResSize);
 
-                    Long turnEndsAt = snapshot.child("turnEndsAt").getValue(Long.class);
+                    Long turnEndsAt = gameSnap.child("turnEndsAt").getValue(Long.class);
                     int p1Score = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
                     int p2Score = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
 
@@ -128,29 +150,23 @@ public class SpojniceManager {
             @NonNull
             @Override
             public Transaction.Result doTransaction(@NonNull MutableData data) {
-                // Ako je par već rešen od strane nekoga, ignoriši
-                if (data.child("resolved").child(String.valueOf(round)).child(String.valueOf(leftIdx)).getValue() != null) {
+                if (data.child("spojnice/resolved").child(String.valueOf(round)).child(String.valueOf(leftIdx)).getValue() != null) {
                     return Transaction.abort();
                 }
 
                 long now = System.currentTimeMillis();
 
                 if (isCorrect) {
-                    // Upisujemo pogodak u bazu odmah
-                    data.child("resolved").child(String.valueOf(round)).child(String.valueOf(leftIdx)).setValue(playerNum);
+                    data.child("spojnice/resolved").child(String.valueOf(round)).child(String.valueOf(leftIdx)).setValue(playerNum);
 
-                    // Dodaj bodove (2 boda po paru)
                     Long currentScore = data.child("scores/player" + playerNum).getValue(Long.class);
                     data.child("scores/player" + playerNum).setValue((currentScore != null ? currentScore : 0) + 2);
 
-                    // Provera da li su svi parovi u ovoj rundi rešeni
-                    long resolvedCount = data.child("resolved").child(String.valueOf(round)).getChildrenCount();
+                    long resolvedCount = data.child("spojnice/resolved").child(String.valueOf(round)).getChildrenCount();
                     if (resolvedCount >= totalPairCount) {
                         advanceRoundOrFinish(data, round, now);
                     }
-                    // Ako je tačno, a ima još polja, activePlayer ostaje ISTI, tajmer se NE resetuje (igrač troši svojih 30s)
                 } else {
-                    // NETAČNO: Igrač gubi potez!
                     handleTurnTimeoutOrWrong(data, round, playerNum, totalPairCount, now);
                 }
 
@@ -162,12 +178,11 @@ public class SpojniceManager {
         });
     }
 
-    // KOREKCIJA: Upravljanje istekom vremena ili greškom (Prelazak na drugog igrača ili sledeću rundu)
     public void handleTurnTimeoutOrWrong(MutableData data, int round, int playerNum, int totalPairCount, long now) {
         int startingPlayerForRound = (round % 2) + 1;
         boolean isStartingPlayer = (playerNum == startingPlayerForRound);
 
-        long resolvedCount = data.child("resolved").child(String.valueOf(round)).getChildrenCount();
+        long resolvedCount = data.child("spojnice/resolved").child(String.valueOf(round)).getChildrenCount();
 
         if (resolvedCount >= totalPairCount) {
             advanceRoundOrFinish(data, round, now);
@@ -175,12 +190,10 @@ public class SpojniceManager {
         }
 
         if (isStartingPlayer) {
-            // Prvi igrač je pogrešio/istekao -> prepusti preostale pojmove drugom igraču (dobija novih 30s)
             int nextPlayer = 3 - playerNum;
-            data.child("currentPlayer").setValue(nextPlayer);
-            data.child("turnEndsAt").setValue(now + 30_000L);
+            data.child("spojnice/currentPlayer").setValue(nextPlayer);
+            data.child("spojnice/turnEndsAt").setValue(now + 30_000L);
         } else {
-            // Drugi igrač je pogrešio/istekao -> Kraj ove runde, idemo na sledeću
             advanceRoundOrFinish(data, round, now);
         }
     }
@@ -188,21 +201,12 @@ public class SpojniceManager {
     private void advanceRoundOrFinish(MutableData data, int round, long now) {
         int nextRound = round + 1;
         if (nextRound < totalRounds) {
-            int nextPlayer = (nextRound % 2) + 1; // Runda 1 (indeks 0) počinje P1, Runda 2 (indeks 1) počinje P2
-            data.child("currentRound").setValue(nextRound);
-            data.child("currentPlayer").setValue(nextPlayer);
-            data.child("turnEndsAt").setValue(now + 30_000L);
+            int nextPlayer = (nextRound % 2) + 1;
+            data.child("spojnice/currentRound").setValue(nextRound);
+            data.child("spojnice/currentPlayer").setValue(nextPlayer);
+            data.child("spojnice/turnEndsAt").setValue(now + 30_000L);
         } else {
-            // Sve runde su gotove -> Kraj igre
-            Long p1 = data.child("scores/player1").getValue(Long.class);
-            Long p2 = data.child("scores/player2").getValue(Long.class);
-            int p1Sc = p1 != null ? p1.intValue() : 0;
-            int p2Sc = p2 != null ? p2.intValue() : 0;
-
-            String winner = p1Sc > p2Sc ? "player1" : (p2Sc > p1Sc ? "player2" : "draw");
-            data.child("status").setValue("game_finished");
-            data.child("winner").setValue(winner);
-            data.child("finishedAt").setValue(now);
+            data.child("spojnice/status").setValue("game_finished");
         }
     }
 

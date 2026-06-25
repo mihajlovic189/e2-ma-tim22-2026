@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.slagalicaapp.model.GameResult;
 import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.example.slagalicaapp.R;
+import com.example.slagalicaapp.data.firebase.ChallengeManager; // DODATO
 import com.example.slagalicaapp.ui.fragments.KorakPoKorakFragment;
 import com.example.slagalicaapp.ui.fragments.MojBrojFragment;
 import com.example.slagalicaapp.ui.fragments.AsocijacijeMultiplayerFragment;
@@ -22,6 +23,9 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -31,6 +35,7 @@ public class GameActivity extends AppCompatActivity {
     private static final String TAG = "GameActivity";
 
     public static final String EXTRA_ROOM_ID   = "ROOM_ID";
+    public static final String EXTRA_CHALLENGE_ID = "CHALLENGE_ID"; // DODATO
     public static final String EXTRA_PLAYER_NUM = "PLAYER_NUM";
     public static final String EXTRA_PLAYER_NAME = "PLAYER_NAME";
 
@@ -44,11 +49,15 @@ public class GameActivity extends AppCompatActivity {
     public static final String GAME_ASOCIJACIJE = "ASOCIJACIJE";
 
     private String roomId;
+    private String challengeId; // DODATO
     private int playerNumber;
     private String currentSubGame = GAME_KO_ZNA_ZNA;
     private String playerName;
     private boolean hasForfeited = false;
     private boolean finalResultSaved = false;
+
+    // Lokalni brojač poena za samostalno igranje u Izazovu
+    private int ukupniPoeniIzazova = 0;
 
     private DatabaseReference roomRef;
     private ValueEventListener roomListener;
@@ -63,24 +72,38 @@ public class GameActivity extends AppCompatActivity {
         if (savedInstanceState != null) return;
 
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
+        challengeId = getIntent().getStringExtra(EXTRA_CHALLENGE_ID); // DODATO
         playerNumber = getIntent().getIntExtra(EXTRA_PLAYER_NUM, 1);
         playerName = getIntent().getStringExtra(EXTRA_PLAYER_NAME);
 
-        if (roomId == null) {
-            Toast.makeText(this, "Greška: Soba nije prosleđena.", Toast.LENGTH_SHORT).show();
+        // PRILAGOĐENO: Soba može biti null ako je u pitanju asinhroni izazov
+        if (roomId == null && challengeId == null) {
+            Toast.makeText(this, "Greška: Identifikator partije nije prosleđen.", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        roomRef = FirebaseDatabase.getInstance().getReference().child("rooms").child(GAME_MECH).child(roomId);
-
         getSupportFragmentManager().setFragmentResultListener(
-                "GAME_FINISHED", this, (requestKey, result) -> handleSubGameFinished());
+                "GAME_FINISHED", this, (requestKey, result) -> {
+                    // Ako fragment vraća sakupljene poene, dodajemo ih u zbir za izazov
+                    if (result.containsKey("points")) {
+                        ukupniPoeniIzazova += result.getInt("points");
+                    }
+                    handleSubGameFinished();
+                });
 
-        resolvePlayerNumberFromRoom(this::pratiStanjePartije);
+        if (challengeId != null) {
+            // Ako je u pitanju IZAZOV, igrač igra samostalno i odmah otvaramo prvu igru
+            showGameFragment(currentSubGame);
+        } else {
+            // Standardni 1v1 multiplayer preko soba
+            roomRef = FirebaseDatabase.getInstance().getReference().child("rooms").child(GAME_MECH).child(roomId);
+            resolvePlayerNumberFromRoom(this::pratiStanjePartije);
+        }
     }
 
     private void pratiStanjePartije() {
+        if (roomRef == null) return;
         roomListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -116,28 +139,70 @@ public class GameActivity extends AppCompatActivity {
     }
 
     private void handleSubGameFinished() {
-        if (GAME_KO_ZNA_ZNA.equals(currentSubGame)) {
-            if (playerNumber == 1) roomRef.child("currentGameType").setValue(GAME_SPOJNICE);
+        // GRANANJE LOGIKE: Ako je izazov, igrač samostalno menja igre lokalno
+        if (challengeId != null) {
+            switch (currentSubGame) {
+                case GAME_KO_ZNA_ZNA:
+                    currentSubGame = GAME_SPOJNICE;
+                    break;
+                case GAME_SPOJNICE:
+                    currentSubGame = GAME_ASOCIJACIJE;
+                    break;
+                case GAME_ASOCIJACIJE:
+                    currentSubGame = GAME_SKOCKO;
+                    break;
+                case GAME_SKOCKO:
+                    currentSubGame = GAME_KORAK;
+                    break;
+                case GAME_KORAK:
+                    currentSubGame = GAME_MOJ_BROJ;
+                    break;
+                case GAME_MOJ_BROJ:
+                    završiIzazovIUpisiRezultat();
+                    return;
+            }
+            showGameFragment(currentSubGame);
+        } else {
+            // Standardna 1v1 multiplayer logika (sinhronizovana preko baze)
+            if (GAME_MOJ_BROJ.equals(currentSubGame)) {
+                if (roomListener != null) roomRef.removeEventListener(roomListener);
+                persistFinalResultAndFinish(false);
+                return;
+            }
+            if (playerNumber == 1) {
+                String nextGame;
+                if (GAME_KO_ZNA_ZNA.equals(currentSubGame))   nextGame = GAME_SPOJNICE;
+                else if (GAME_SPOJNICE.equals(currentSubGame)) nextGame = GAME_ASOCIJACIJE;
+                else if (GAME_ASOCIJACIJE.equals(currentSubGame)) nextGame = GAME_SKOCKO;
+                else if (GAME_SKOCKO.equals(currentSubGame))   nextGame = GAME_KORAK;
+                else nextGame = GAME_MOJ_BROJ;
 
-        } else if (GAME_SPOJNICE.equals(currentSubGame)) {
-            if (playerNumber == 1) roomRef.child("currentGameType").setValue(GAME_ASOCIJACIJE);
-
-        } else if (GAME_ASOCIJACIJE.equals(currentSubGame)) {
-            if (playerNumber == 1) roomRef.child("currentGameType").setValue(GAME_SKOCKO);
-
-        } else if (GAME_SKOCKO.equals(currentSubGame)) {
-            if (playerNumber == 1) roomRef.child("currentGameType").setValue(GAME_KORAK);
-
-        } else if (GAME_KORAK.equals(currentSubGame)) {
-            if (playerNumber == 1) roomRef.child("currentGameType").setValue(GAME_MOJ_BROJ);
-
-        } else if (GAME_MOJ_BROJ.equals(currentSubGame)) {
-            if (roomListener != null) roomRef.removeEventListener(roomListener);
-            persistFinalResultAndFinish(false);
+                Map<String, Object> transition = new HashMap<>();
+                transition.put("currentGameType", nextGame);
+                transition.put("status", "playing");
+                roomRef.updateChildren(transition);
+            }
         }
     }
 
+    /**
+     * DODATO: Slanje finalnog rezultata za asinhroni Mini-Turnir Izazov
+     */
+    private void završiIzazovIUpisiRezultat() {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null && challengeId != null) {
+            ChallengeManager manager = new ChallengeManager();
+            manager.submitFinalScore(challengeId, user.getUid(), ukupniPoeniIzazova);
+            Toast.makeText(this, "Izazov uspešno odigran! Ukupno poena: " + ukupniPoeniIzazova, Toast.LENGTH_LONG).show();
+        }
+        finish();
+    }
+
     private void resolvePlayerNumberFromRoom(Runnable onReady) {
+        if (roomRef == null) {
+            onReady.run();
+            return;
+        }
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -172,7 +237,9 @@ public class GameActivity extends AppCompatActivity {
     private void showGameFragment(String gameType) {
         Bundle args = new Bundle();
         args.putString("roomId", roomId);
+        args.putString("challengeId", challengeId);
         args.putInt("playerNumber", playerNumber);
+        args.putInt("cumulativePoints", ukupniPoeniIzazova);
 
         androidx.fragment.app.Fragment fragment;
 
@@ -199,23 +266,26 @@ public class GameActivity extends AppCompatActivity {
     }
 
     public void forfeitMatch() {
+        if (challengeId != null) {
+            završiIzazovIUpisiRezultat();
+            return;
+        }
+
         if (hasForfeited || roomId == null) return;
         hasForfeited = true;
 
         if (roomListener != null) roomRef.removeEventListener(roomListener);
 
-        String myLeftKey = "player" + playerNumber + "Left"; // npr. player1Left
+        String myLeftKey = "player" + playerNumber + "Left";
         String opponentKey = playerNumber == 1 ? "player2" : "player1";
 
         Map<String, Object> update = new HashMap<>();
         update.put(myLeftKey, true);
-
         update.put("status", "forfeit");
         update.put("forfeitBy", "player" + playerNumber);
         update.put("winner", opponentKey);
 
         roomRef.updateChildren(update);
-
         primenikaznuZbogNapustanja();
     }
 
@@ -226,27 +296,17 @@ public class GameActivity extends AppCompatActivity {
             return;
         }
 
-        DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(currentUser.getUid());
-        userRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot userSnapshot) {
-                if (userSnapshot.exists()) {
-                    int trenutneZvezde = userSnapshot.child("stars").getValue(Integer.class) != null ?
-                            userSnapshot.child("stars").getValue(Integer.class) : 0;
-
-                    int noveZvezde = Math.max(0, trenutneZvezde - 10);
-                    userRef.child("stars").setValue(noveZvezde);
-
+        FirebaseFirestore.getInstance().collection("users").document(currentUser.getUid())
+                .get()
+                .addOnSuccessListener(doc -> {
+                    long trenutneZvezde = doc.getLong("totalStars") != null ? doc.getLong("totalStars") : 0;
+                    long noveZvezde = Math.max(0, trenutneZvezde - 10);
+                    FirebaseFirestore.getInstance().collection("users").document(currentUser.getUid())
+                            .update("totalStars", noveZvezde);
                     Toast.makeText(GameActivity.this, "Napustili ste partiju. Izgubili ste 10 zvezda.", Toast.LENGTH_SHORT).show();
-                }
-                finish();
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                finish();
-            }
-        });
+                    finish();
+                })
+                .addOnFailureListener(e -> finish());
     }
 
     private void persistFinalResultAndFinish(boolean forfeit) {
@@ -264,7 +324,6 @@ public class GameActivity extends AppCompatActivity {
 
         finalResultSaved = true;
         long finishedAt = System.currentTimeMillis();
-
         String firestoreCollection = "slagalica_match_results";
 
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -303,75 +362,71 @@ public class GameActivity extends AppCompatActivity {
     }
 
     private void primeniEkonomijuZvezdaITokena(GameResult result, String currentUid) {
-        DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(currentUid);
+        FirebaseFirestore.getInstance().collection("users").document(currentUid)
+                .get()
+                .addOnSuccessListener(doc -> {
+                    if (!doc.exists()) {
+                        ocistiSobuIAzurnoZavrsi();
+                        return;
+                    }
 
-        userRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot userSnapshot) {
-                if (!userSnapshot.exists()) {
-                    ocistiSobuIAzurnoZavrsi();
-                    return;
-                }
+                    int trenutneZvezde = doc.getLong("totalStars") != null ? doc.getLong("totalStars").intValue() : 0;
+                    int trenutniTokeni = doc.getLong("tokenCount") != null ? doc.getLong("tokenCount").intValue() : 0;
 
-                int trenutneZvezde = userSnapshot.child("stars").getValue(Integer.class) != null ?
-                        userSnapshot.child("stars").getValue(Integer.class) : 0;
-                int trenutniTokeni = userSnapshot.child("tokens").getValue(Integer.class) != null ?
-                        userSnapshot.child("tokens").getValue(Integer.class) : 0;
+                    int mojSkor = currentUid.equals(result.player1Uid) ? result.player1Score : result.player2Score;
 
-                int mojSkor = currentUid.equals(result.player1Uid) ? result.player1Score : result.player2Score;
+                    boolean samJaPobednik = currentUid.equals(result.winnerUid);
+                    boolean jeNereseno = (result.winnerUid == null);
 
-                boolean samJaPobednik = currentUid.equals(result.winnerUid);
-                boolean jeNereseno = (result.winnerUid == null);
+                    int finalneZvezde;
+                    int razlikaZvezda;
+                    int bodovneZvezde = mojSkor / 40;
 
-                int finalneZvezde;
-                int razlikaZvezda;
-
-                int bodovneZvezde = mojSkor / 40;
-
-                if (jeNereseno) {
-                    razlikaZvezda = bodovneZvezde;
-                    finalneZvezde = Math.max(0, trenutneZvezde + razlikaZvezda);
-                } else {
-                    Map<String, Integer> epilog = StatsCalculator.obradiKrajPartije(samJaPobednik, mojSkor, trenutneZvezde);
-                    if (epilog != null && epilog.containsKey("finalStars") && epilog.containsKey("starDifference")) {
-                        finalneZvezde = epilog.get("finalStars");
-                        razlikaZvezda = epilog.get("starDifference");
-                    } else {
-                        if (samJaPobednik) {
-                            razlikaZvezda = 10 + bodovneZvezde;
-                        } else {
-                            razlikaZvezda = -10 + bodovneZvezde;
-                        }
+                    if (jeNereseno) {
+                        razlikaZvezda = bodovneZvezde;
                         finalneZvezde = Math.max(0, trenutneZvezde + razlikaZvezda);
+                    } else {
+                        Map<String, Integer> epilog = StatsCalculator.obradiKrajPartije(samJaPobednik, mojSkor, trenutneZvezde);
+                        if (epilog != null && epilog.containsKey("finalStars") && epilog.containsKey("starDifference")) {
+                            finalneZvezde = epilog.get("finalStars");
+                            razlikaZvezda = epilog.get("starDifference");
+                        } else {
+                            if (samJaPobednik) {
+                                razlikaZvezda = 10 + bodovneZvezde;
+                            } else {
+                                razlikaZvezda = -10 + bodovneZvezde;
+                            }
+                            finalneZvezde = Math.max(0, trenutneZvezde + razlikaZvezda);
+                        }
                     }
-                }
 
-                int stariTokeniIzZvezda = trenutneZvezde / 50;
-                int noviTokeniIzZvezda = finalneZvezde / 50;
-                int nagradniTokeni = Math.max(0, noviTokeniIzZvezda - stariTokeniIzZvezda);
+                    int stariTokeniIzZvezda = trenutneZvezde / 50;
+                    int noviTokeniIzZvezda = finalneZvezde / 50;
+                    int nagradniTokeni = Math.max(0, noviTokeniIzZvezda - stariTokeniIzZvezda);
 
-                Map<String, Object> updates = new HashMap<>();
-                updates.put("stars", finalneZvezde);
-                updates.put("tokens", trenutniTokeni + nagradniTokeni);
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("totalStars", finalneZvezde);
+                    updates.put("tokenCount", trenutniTokeni + nagradniTokeni);
 
-                userRef.updateChildren(updates).addOnSuccessListener(unused -> {
-                    String poruka = jeNereseno ? "Nerešeno! " : (samJaPobednik ? "Pobeda! " : "Poraz! ");
-                    poruka += (razlikaZvezda >= 0 ? "+" : "") + razlikaZvezda + " zvezda.";
+                    final int finalRazlika = razlikaZvezda;
+                    final int finalNagrada = nagradniTokeni;
+                    final boolean finalPobeda = samJaPobednik;
+                    final boolean finalNeres = jeNereseno;
 
-                    if (nagradniTokeni > 0) {
-                        poruka += " Osvojili ste " + nagradniTokeni + " token(a) zbog prelaska praga od 50 zvezda!";
-                    }
-                    Toast.makeText(GameActivity.this, poruka, Toast.LENGTH_LONG).show();
-
-                    ocistiSobuIAzurnoZavrsi();
-                }).addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                ocistiSobuIAzurnoZavrsi();
-            }
-        });
+                    FirebaseFirestore.getInstance().collection("users").document(currentUid)
+                            .update(updates)
+                            .addOnSuccessListener(unused -> {
+                                String poruka = finalNeres ? "Nerešeno! " : (finalPobeda ? "Pobeda! " : "Poraz! ");
+                                poruka += (finalRazlika >= 0 ? "+" : "") + finalRazlika + " zvezda.";
+                                if (finalNagrada > 0) {
+                                    poruka += " Osvojili ste " + finalNagrada + " token(a) zbog prelaska praga od 50 zvezda!";
+                                }
+                                Toast.makeText(GameActivity.this, poruka, Toast.LENGTH_LONG).show();
+                                ocistiSobuIAzurnoZavrsi();
+                            })
+                            .addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
+                })
+                .addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
     }
 
     private void ocistiSobuIAzurnoZavrsi() {

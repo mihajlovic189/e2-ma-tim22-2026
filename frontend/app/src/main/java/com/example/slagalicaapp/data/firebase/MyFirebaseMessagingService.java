@@ -1,23 +1,20 @@
 package com.example.slagalicaapp.data.firebase;
 
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 
 import com.example.slagalicaapp.R;
+import com.example.slagalicaapp.SlagalicaApp;
 import com.example.slagalicaapp.ui.activities.MainActivity;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
-
-    private static final String CHANNEL_ID = "regional_chat_notifications";
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
@@ -35,6 +32,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 return;
             }
 
+            if (SlagalicaApp.isUserInChatScreen) {
+                return;
+            }
+
             sendNotification(senderName, messageText);
         }
     }
@@ -49,19 +50,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         NotificationManager notificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
-                    "Regionalni Čet",
-                    NotificationManager.IMPORTANCE_DEFAULT);
-            if (notificationManager != null) {
-                notificationManager.createNotificationChannel(channel);
-            }
-        }
-
         NotificationCompat.Builder notificationBuilder =
-                new NotificationCompat.Builder(this, CHANNEL_ID)
+                new NotificationCompat.Builder(this, SlagalicaApp.CHANNEL_CHAT)
                         .setSmallIcon(R.mipmap.ic_launcher)
-                        .setContentTitle(title)
+                        .setContentTitle("Nova poruka od: " + title)
                         .setContentText(messageBody)
                         .setAutoCancel(true)
                         .setContentIntent(pendingIntent)

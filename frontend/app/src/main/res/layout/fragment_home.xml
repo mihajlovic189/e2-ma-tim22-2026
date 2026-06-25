@@ -53,6 +53,23 @@
             android:textColor="@color/text"
             android:backgroundTint="#1E3A5F" />
 
+        <Button
+            android:id="@+id/btnRegionalChallenges"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🏆 REGIONALNI IZAZOVI"
+            android:backgroundTint="#FF5722"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btnRegionalChat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="💬  Regionalni čet"
+            android:textColor="@color/text"
+            android:backgroundTint="#1E3A5F" />
+
     </LinearLayout>
 
     <ImageButton

@@ -28,7 +28,6 @@ public class MojBrojManager {
     private static final long ROUND_DURATION_MS = 60000L;
 
     public MojBrojManager(String roomId, int myPlayerNumber, MojBrojListener listener) {
-        // KOREKCIJA: sinhronizovano sa krovnim čvorom meča
         this.roomRef = FirebaseDatabase.getInstance().getReference()
                 .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
         this.myPlayerNumber = myPlayerNumber;
@@ -51,11 +50,20 @@ public class MojBrojManager {
                 String status = snapshot.child("status").getValue(String.class);
                 if (status == null) return;
 
-                String roundStatus = snapshot.child("roundStatus").getValue(String.class);
+                if ("forfeit".equals(status)) {
+                    int p1Score = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
+                    int p2Score = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
+                    listener.onGameFinished(p1Score, p2Score, snapshot.child("forfeitBy").getValue(String.class));
+                    return;
+                }
+
+                DataSnapshot gameSnap = snapshot.child("mojBroj");
+
+                String roundStatus = gameSnap.child("roundStatus").getValue(String.class);
                 if (roundStatus == null) roundStatus = "";
 
-                int round = toInt(snapshot.child("currentRound").getValue(Long.class));
-                int activePlayer = toInt(snapshot.child("activePlayer").getValue(Long.class));
+                int round = toInt(gameSnap.child("currentRound").getValue(Long.class));
+                int activePlayer = toInt(gameSnap.child("activePlayer").getValue(Long.class));
 
                 if (round > lastRound && "playing".equals(status)) {
                     lastRound = round;
@@ -65,28 +73,28 @@ public class MojBrojManager {
                     lastP1Submitted = false;
                     lastP2Submitted = false;
 
-                    int target = toInt(snapshot.child("targetNumber").getValue(Long.class));
-                    List<Integer> nums = readNumbers(snapshot);
+                    int target = toInt(gameSnap.child("targetNumber").getValue(Long.class));
+                    List<Integer> nums = readNumbers(gameSnap);
                     listener.onRoundStarted(activePlayer, round, target, nums);
                 }
 
-                boolean targetRevealed = Boolean.TRUE.equals(snapshot.child("targetRevealed").getValue(Boolean.class));
+                boolean targetRevealed = Boolean.TRUE.equals(gameSnap.child("targetRevealed").getValue(Boolean.class));
                 if (targetRevealed && !lastTargetRevealed) {
                     lastTargetRevealed = true;
-                    int target = toInt(snapshot.child("targetNumber").getValue(Long.class));
+                    int target = toInt(gameSnap.child("targetNumber").getValue(Long.class));
                     listener.onTargetRevealed(target);
                 }
 
-                boolean numbersRevealed = Boolean.TRUE.equals(snapshot.child("numbersRevealed").getValue(Boolean.class));
+                boolean numbersRevealed = Boolean.TRUE.equals(gameSnap.child("numbersRevealed").getValue(Boolean.class));
                 if (numbersRevealed && !lastNumbersRevealed) {
                     lastNumbersRevealed = true;
-                    int target = toInt(snapshot.child("targetNumber").getValue(Long.class));
-                    List<Integer> nums = readNumbers(snapshot);
+                    int target = toInt(gameSnap.child("targetNumber").getValue(Long.class));
+                    List<Integer> nums = readNumbers(gameSnap);
                     listener.onNumbersRevealed(target, nums);
                 }
 
-                boolean p1Submitted = Boolean.TRUE.equals(snapshot.child("submissions").child("player1").child("submitted").getValue(Boolean.class));
-                boolean p2Submitted = Boolean.TRUE.equals(snapshot.child("submissions").child("player2").child("submitted").getValue(Boolean.class));
+                boolean p1Submitted = Boolean.TRUE.equals(gameSnap.child("submissions").child("player1").child("submitted").getValue(Boolean.class));
+                boolean p2Submitted = Boolean.TRUE.equals(gameSnap.child("submissions").child("player2").child("submitted").getValue(Boolean.class));
 
                 if (myPlayerNumber == 1 && p2Submitted && !lastP2Submitted) {
                     lastP2Submitted = true;
@@ -97,19 +105,18 @@ public class MojBrojManager {
                     listener.onOpponentSubmitted();
                 }
 
-                // Samo igrač 1 vrši evaluaciju i kalkulaciju bodova
                 if (myPlayerNumber == 1 && p1Submitted && p2Submitted && (!lastP1Submitted || !lastP2Submitted)) {
                     lastP1Submitted = true;
                     lastP2Submitted = true;
-                    attemptFinalizeRound(snapshot, round, activePlayer);
+                    attemptFinalizeRound(gameSnap, snapshot, round, activePlayer);
                 }
 
                 if ("round_finished".equals(roundStatus) && !lastStatus.equals("round_finished")) {
                     lastStatus = "round_finished";
-                    int target = toInt(snapshot.child("targetNumber").getValue(Long.class));
+                    int target = toInt(gameSnap.child("targetNumber").getValue(Long.class));
                     int p1Score = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
                     int p2Score = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
-                    String msg = snapshot.child("lastRoundMessage").getValue(String.class);
+                    String msg = gameSnap.child("lastRoundMessage").getValue(String.class);
                     listener.onRoundResult(p1Score, p2Score, target, msg != null ? msg : "");
                 }
 
@@ -134,9 +141,9 @@ public class MojBrojManager {
     public void revealTargetNumber() {
         int target = random.nextInt(999) + 1;
         Map<String, Object> update = new HashMap<>();
-        update.put("targetNumber", target);
-        update.put("targetRevealed", true);
-        update.put("numbersRevealed", false);
+        update.put("mojBroj/targetNumber", target);
+        update.put("mojBroj/targetRevealed", true);
+        update.put("mojBroj/numbersRevealed", false);
         roomRef.updateChildren(update);
     }
 
@@ -144,16 +151,16 @@ public class MojBrojManager {
         List<Integer> nums = generateNumbers();
         Map<String, Object> update = new HashMap<>();
         for (int i = 0; i < nums.size(); i++) {
-            update.put("numbers/n" + i, nums.get(i));
+            update.put("mojBroj/numbers/n" + i, nums.get(i));
         }
-        update.put("numbersRevealed", true);
-        update.put("roundEndsAt", System.currentTimeMillis() + ROUND_DURATION_MS);
-        update.put("roundStatus", "playing");
+        update.put("mojBroj/numbersRevealed", true);
+        update.put("mojBroj/roundEndsAt", System.currentTimeMillis() + ROUND_DURATION_MS);
+        update.put("mojBroj/roundStatus", "playing");
         roomRef.updateChildren(update);
     }
 
     public void revealTargetIfNeeded() {
-        roomRef.child("targetRevealed").addListenerForSingleValueEvent(new ValueEventListener() {
+        roomRef.child("mojBroj/targetRevealed").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!Boolean.TRUE.equals(snapshot.getValue(Boolean.class))) {
@@ -165,7 +172,7 @@ public class MojBrojManager {
     }
 
     public void revealNumbersIfNeeded() {
-        roomRef.child("numbersRevealed").addListenerForSingleValueEvent(new ValueEventListener() {
+        roomRef.child("mojBroj/numbersRevealed").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!Boolean.TRUE.equals(snapshot.getValue(Boolean.class))) {
@@ -182,7 +189,7 @@ public class MojBrojManager {
         submission.put("expression", expression);
         submission.put("result", result);
         submission.put("submitted", true);
-        roomRef.child("submissions").child(playerKey).setValue(submission);
+        roomRef.child("mojBroj/submissions").child(playerKey).setValue(submission);
     }
 
     public void finalizeOnTimeout() {
@@ -190,19 +197,20 @@ public class MojBrojManager {
             roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    boolean p1Sub = Boolean.TRUE.equals(snapshot.child("submissions").child("player1").child("submitted").getValue(Boolean.class));
-                    boolean p2Sub = Boolean.TRUE.equals(snapshot.child("submissions").child("player2").child("submitted").getValue(Boolean.class));
+                    DataSnapshot subsSnap = snapshot.child("mojBroj/submissions");
+                    boolean p1Sub = Boolean.TRUE.equals(subsSnap.child("player1").child("submitted").getValue(Boolean.class));
+                    boolean p2Sub = Boolean.TRUE.equals(subsSnap.child("player2").child("submitted").getValue(Boolean.class));
 
                     Map<String, Object> upd = new HashMap<>();
                     if (!p1Sub) {
-                        upd.put("submissions/player1/expression", "");
-                        upd.put("submissions/player1/result", 0);
-                        upd.put("submissions/player1/submitted", true);
+                        upd.put("mojBroj/submissions/player1/expression", "");
+                        upd.put("mojBroj/submissions/player1/result", 0);
+                        upd.put("mojBroj/submissions/player1/submitted", true);
                     }
                     if (!p2Sub) {
-                        upd.put("submissions/player2/expression", "");
-                        upd.put("submissions/player2/result", 0);
-                        upd.put("submissions/player2/submitted", true);
+                        upd.put("mojBroj/submissions/player2/expression", "");
+                        upd.put("mojBroj/submissions/player2/result", 0);
+                        upd.put("mojBroj/submissions/player2/submitted", true);
                     }
                     if (!upd.isEmpty()) {
                         roomRef.updateChildren(upd);
@@ -213,13 +221,13 @@ public class MojBrojManager {
         }
     }
 
-    private void attemptFinalizeRound(DataSnapshot snapshot, int round, int activePlayer) {
-        int target = toInt(snapshot.child("targetNumber").getValue(Long.class));
-        int p1Res = toInt(snapshot.child("submissions").child("player1").child("result").getValue(Long.class));
-        int p2Res = toInt(snapshot.child("submissions").child("player2").child("result").getValue(Long.class));
+    private void attemptFinalizeRound(DataSnapshot gameSnap, DataSnapshot roomSnap, int round, int activePlayer) {
+        int target = toInt(gameSnap.child("targetNumber").getValue(Long.class));
+        int p1Res = toInt(gameSnap.child("submissions").child("player1").child("result").getValue(Long.class));
+        int p2Res = toInt(gameSnap.child("submissions").child("player2").child("result").getValue(Long.class));
 
-        int p1OldScore = toInt(snapshot.child("scores").child("player1").getValue(Long.class));
-        int p2OldScore = toInt(snapshot.child("scores").child("player2").getValue(Long.class));
+        int p1OldScore = toInt(roomSnap.child("scores").child("player1").getValue(Long.class));
+        int p2OldScore = toInt(roomSnap.child("scores").child("player2").getValue(Long.class));
 
         int p1Add = 0, p2Add = 0;
         String message = "";
@@ -227,7 +235,6 @@ public class MojBrojManager {
         int p1Diff = Math.abs(target - p1Res);
         int p2Diff = Math.abs(target - p2Res);
 
-        // IMPLEMENTACIJA PRAVILA BODOVANJA (g, h, i, j)
         if (p1Res == target && p2Res == target) {
             p1Add = 10; p2Add = 10;
             message = "Oba igrača su pogodila tačan broj! (+10)";
@@ -238,7 +245,6 @@ public class MojBrojManager {
             p2Add = 10;
             message = "Igrač 2 je pogodio tačan broj! (+10)";
         } else {
-            // Ako niko nema tačan broj
             if (p1Res == 0 && p2Res == 0) {
                 message = "Niko nije uneo validan rezultat. (+0)";
             } else if (p1Res > 0 && (p2Res == 0 || p1Diff < p2Diff)) {
@@ -248,7 +254,6 @@ public class MojBrojManager {
                 p2Add = 5;
                 message = "Igrač 2 je bio bliži broju! (+5)";
             } else if (p1Res == p2Res && p1Res > 0) {
-                // Isti rezultat, dobija onaj čija je runda (pravilo j)
                 if (activePlayer == 1) {
                     p1Add = 5;
                     message = "Isti rezultat! Bodovi idu Igraču 1 (njegova runda).";
@@ -262,8 +267,8 @@ public class MojBrojManager {
         Map<String, Object> upd = new HashMap<>();
         upd.put("scores/player1", p1OldScore + p1Add);
         upd.put("scores/player2", p2OldScore + p2Add);
-        upd.put("lastRoundMessage", message);
-        upd.put("roundStatus", round >= 2 ? "game_finished" : "round_finished");
+        upd.put("mojBroj/lastRoundMessage", message);
+        upd.put("mojBroj/roundStatus", round >= 2 ? "game_finished" : "round_finished");
         roomRef.updateChildren(upd);
     }
 
@@ -272,8 +277,8 @@ public class MojBrojManager {
             @NonNull
             @Override
             public Transaction.Result doTransaction(@NonNull MutableData data) {
-                Object roundVal = data.child("currentRound").getValue();
-                Object statusVal = data.child("roundStatus").getValue();
+                Object roundVal = data.child("mojBroj/currentRound").getValue();
+                Object statusVal = data.child("mojBroj/roundStatus").getValue();
                 int round = roundVal instanceof Long ? ((Long) roundVal).intValue() : 0;
                 String status = statusVal instanceof String ? (String) statusVal : "";
 
@@ -281,14 +286,14 @@ public class MojBrojManager {
                     return Transaction.abort();
                 }
 
-                data.child("currentRound").setValue(2);
-                data.child("activePlayer").setValue(nextActivePlayer);
-                data.child("targetNumber").setValue(0);
-                data.child("targetRevealed").setValue(false);
-                data.child("numbersRevealed").setValue(false);
-                data.child("roundStatus").setValue("playing");
-                data.child("roundEndsAt").setValue(0);
-                data.child("submissions").setValue(null);
+                data.child("mojBroj/currentRound").setValue(2);
+                data.child("mojBroj/activePlayer").setValue(nextActivePlayer);
+                data.child("mojBroj/targetNumber").setValue(0);
+                data.child("mojBroj/targetRevealed").setValue(false);
+                data.child("mojBroj/numbersRevealed").setValue(false);
+                data.child("mojBroj/roundStatus").setValue("playing");
+                data.child("mojBroj/roundEndsAt").setValue(0);
+                data.child("mojBroj/submissions").setValue(null);
                 return Transaction.success(data);
             }
 
@@ -313,9 +318,9 @@ public class MojBrojManager {
         return list;
     }
 
-    private List<Integer> readNumbers(DataSnapshot snapshot) {
+    private List<Integer> readNumbers(DataSnapshot gameSnap) {
         List<Integer> list = new ArrayList<>();
-        DataSnapshot ns = snapshot.child("numbers");
+        DataSnapshot ns = gameSnap.child("numbers");
         for (int i = 0; i < 6; i++) {
             Long v = ns.child("n" + i).getValue(Long.class);
             list.add(v != null ? v.intValue() : 0);
@@ -324,5 +329,4 @@ public class MojBrojManager {
     }
 
     private int toInt(Long v) { return v != null ? v.intValue() : 0; }
-    private long toLong(Long v) { return v != null ? v : 0L; }
 }

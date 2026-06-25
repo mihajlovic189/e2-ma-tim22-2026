@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "source": "scripts/functions"
+  },
   "firestore": {
     "rules": "firestore.rules"
   },
@@ -7,4 +10,3 @@
     "instance": "slagalica-mobilna-aplikacija-default-rtdb"
   }]
 }
-

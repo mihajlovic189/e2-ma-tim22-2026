@@ -4,6 +4,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.example.slagalicaapp.game.asocijacije.Asocijacija;
 import com.example.slagalicaapp.game.asocijacije.AsocijacijeRepository;
+import com.example.slagalicaapp.game.korakpokorak.KorakPoKorakItem;
+import com.example.slagalicaapp.game.korakpokorak.KorakPoKorakRepository;
 import com.google.firebase.database.*;
 
 import java.util.ArrayList;
@@ -226,27 +228,29 @@ public class MatchmakingManager {
             roomRef.child("scores").child("player2").setValue(0);
 
             roomRef.child("currentGameType").setValue("KO_ZNA_ZNA");
-            roomRef.child("roundStatus").setValue("playing");
 
             Map<String, Object> baseStates = new HashMap<>();
 
             baseStates.put("korakPoKorak/activePlayer", 1);
             baseStates.put("korakPoKorak/currentStep", -1);
             baseStates.put("korakPoKorak/currentRound", 1);
+            baseStates.put("korakPoKorak/roundStatus", "playing");
 
             baseStates.put("mojBroj/activePlayer", 1);
+            baseStates.put("mojBroj/currentRound", 1);
             baseStates.put("mojBroj/targetRevealed", false);
             baseStates.put("mojBroj/numbersRevealed", false);
             baseStates.put("mojBroj/roundEndsAt", 0L);
+            baseStates.put("mojBroj/roundStatus", "waiting");
 
             baseStates.put("skocko/secret1", generateSkockoSecret());
             baseStates.put("skocko/secret2", generateSkockoSecret());
             baseStates.put("skocko/phase", "ROUND_1_PLAYING");
-            baseStates.put("skocko/phaseEndsAt", startedAt + MAIN_SKOCKO_DURATION_MS);
 
-            baseStates.put("asocijacije/activePlayer", 1);
-            baseStates.put("asocijacije/turnPhase", "opening");
-            baseStates.put("asocijacije/turnEndsAt", 0L);
+            baseStates.put("asocijacije/currentRound", 1);
+            baseStates.put("asocijacije/round1/activePlayer", 1);
+            baseStates.put("asocijacije/round1/turnPhase", "opening");
+            baseStates.put("asocijacije/round1/turnEndsAt", 0L);
 
             baseStates.put("spojnice/currentRound", 0);
             baseStates.put("spojnice/currentPlayer", 1);
@@ -271,12 +275,9 @@ public class MatchmakingManager {
             long now = System.currentTimeMillis();
             Map<String, Object> joinUpdates = new HashMap<>();
             joinUpdates.put("status", "playing");
-            joinUpdates.put("skocko/phaseEndsAt", now + MAIN_SKOCKO_DURATION_MS);
             joinUpdates.put("koZnaZna/currentQuestionIndex", 0);
             joinUpdates.put("koZnaZna/questionStatus", "playing");
             joinUpdates.put("koZnaZna/questionStartedAt", now + 2000L);
-            joinUpdates.put("spojnice/turnEndsAt", now + 32_000L);
-            joinUpdates.put("asocijacije/gameEndsAt", now + 122_000L);
             joinUpdates.put("mojBroj/roundEndsAt", 0L);
 
             roomRef.updateChildren(joinUpdates);
@@ -286,15 +287,23 @@ public class MatchmakingManager {
     }
 
     private void seedAsocijacije(DatabaseReference roomRef, Runnable onDone) {
-        Asocijacija a = AsocijacijeRepository.getNasumicnaAsocijacija();
+        Asocijacija a1 = AsocijacijeRepository.getNasumicnaAsocijacija();
+        Asocijacija a2 = AsocijacijeRepository.getNasumicnaAsocijacija();
         Map<String, Object> data = new HashMap<>();
-        for (Map.Entry<String, String> e : a.polja.entrySet()) {
-            data.put("asocijacije/fields/" + e.getKey(), e.getValue());
+        for (Map.Entry<String, String> e : a1.polja.entrySet()) {
+            data.put("asocijacije/round1/fields/" + e.getKey(), e.getValue());
         }
-        for (Map.Entry<String, String> e : a.resenjaKolona.entrySet()) {
-            data.put("asocijacije/columnSolutions/" + e.getKey(), e.getValue());
+        for (Map.Entry<String, String> e : a1.resenjaKolona.entrySet()) {
+            data.put("asocijacije/round1/columnSolutions/" + e.getKey(), e.getValue());
         }
-        data.put("asocijacije/finalSolution", a.konacnoResenje);
+        data.put("asocijacije/round1/finalSolution", a1.konacnoResenje);
+        for (Map.Entry<String, String> e : a2.polja.entrySet()) {
+            data.put("asocijacije/round2/fields/" + e.getKey(), e.getValue());
+        }
+        for (Map.Entry<String, String> e : a2.resenjaKolona.entrySet()) {
+            data.put("asocijacije/round2/columnSolutions/" + e.getKey(), e.getValue());
+        }
+        data.put("asocijacije/round2/finalSolution", a2.konacnoResenje);
         roomRef.updateChildren(data, (error, ref) -> {
             if (error != null) listener.onError(error.getMessage());
             onDone.run();
@@ -405,7 +414,7 @@ public class MatchmakingManager {
                     items.add(child);
                 }
                 if (items.isEmpty()) {
-                    onDone.run();
+                    seedKorakRoundsFromLocal(roomRef, onDone);
                     return;
                 }
 
@@ -425,8 +434,26 @@ public class MatchmakingManager {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                onDone.run();
+                seedKorakRoundsFromLocal(roomRef, onDone);
             }
+        });
+    }
+
+    private void seedKorakRoundsFromLocal(DatabaseReference roomRef, Runnable onDone) {
+        KorakPoKorakItem r1 = KorakPoKorakRepository.getRandomItem();
+        KorakPoKorakItem r2 = KorakPoKorakRepository.getRandomItem();
+        Map<String, Object> roundsMap = new HashMap<>();
+        roundsMap.put("1/solution", r1.solution);
+        for (int i = 0; i < r1.steps.size(); i++) {
+            roundsMap.put("1/steps/" + i, r1.steps.get(i));
+        }
+        roundsMap.put("2/solution", r2.solution);
+        for (int i = 0; i < r2.steps.size(); i++) {
+            roundsMap.put("2/steps/" + i, r2.steps.get(i));
+        }
+        roomRef.child("korakPoKorak/rounds").updateChildren(roundsMap, (error, ref) -> {
+            if (error != null) listener.onError(error.getMessage());
+            onDone.run();
         });
     }
 

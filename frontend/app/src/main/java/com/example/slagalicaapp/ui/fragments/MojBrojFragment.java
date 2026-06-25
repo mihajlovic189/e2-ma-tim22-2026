@@ -27,7 +27,10 @@ import net.objecthunter.exp4j.Expression;
 import net.objecthunter.exp4j.ExpressionBuilder;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 public class MojBrojFragment extends Fragment implements SensorEventListener {
 
@@ -45,6 +48,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     private int stopCount = 0;
 
     private int player1Points = 0;
+    private int cumulativePoints = 0;
     private int player2Points = 0;
 
     private SensorManager sensorManager;
@@ -64,8 +68,9 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
 
         Bundle args = getArguments();
         if (args != null) {
-            roomId = args.getString("roomId");
-            myPlayerNumber = args.getInt("playerNumber", 1);
+            roomId           = args.getString("roomId");
+            myPlayerNumber   = args.getInt("playerNumber", 1);
+            cumulativePoints = args.getInt("cumulativePoints", 0);
         }
 
         setupShakeSensor();
@@ -76,7 +81,10 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     }
 
     private void setupFirebase() {
-        if (roomId == null) return;
+        if (roomId == null) {
+            setupStandaloneGame();
+            return;
+        }
 
         if (binding != null && binding.gameStatus.btnForfeit != null) {
             binding.gameStatus.btnForfeit.setOnClickListener(v -> showForfeitDialog());
@@ -347,12 +355,67 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
             setInputEnabled(false);
             Toast.makeText(getContext(),
                     "Predano! Tvoj rezultat: " + currentResult, Toast.LENGTH_SHORT).show();
+        } else {
+            hasSubmitted = true;
+            binding.btnSubmit.setEnabled(false);
+            setInputEnabled(false);
+            if (gameTimer != null) { gameTimer.cancel(); gameTimer = null; }
+
+            int diff = Math.abs(targetNumber - currentResult);
+            int score = diff == 0 ? 20 : diff <= 10 ? 10 : diff <= 20 ? 5 : 0;
+            player1Points = cumulativePoints + score;
+            updateScoreUI();
+            Toast.makeText(getContext(), "Rezultat: " + currentResult + " (razlika: " + diff + ")", Toast.LENGTH_SHORT).show();
+            autoStopHandler.postDelayed(() -> { if (isAdded()) notifyStandaloneFinished(score); }, 2000);
         }
     }
 
     private void updateScoreUI() {
         binding.gameStatus.tvPlayer1Score.setText(String.valueOf(player1Points));
         binding.gameStatus.tvPlayer2Score.setText(String.valueOf(player2Points));
+    }
+
+    private void setupStandaloneGame() {
+        iAmActivePlayer = true;
+        hasSubmitted = false;
+        stopCount = 2;
+
+        Random rand = new Random();
+        targetNumber = 100 + rand.nextInt(900);
+        availableNumbers.clear();
+        for (int i = 0; i < 4; i++) availableNumbers.add(1 + rand.nextInt(9)); // single-digit
+        int[] mediums = {10, 15, 20};
+        availableNumbers.add(mediums[rand.nextInt(mediums.length)]);
+        int[] larges = {25, 50, 75, 100};
+        availableNumbers.add(larges[rand.nextInt(larges.length)]);
+        Collections.shuffle(availableNumbers, rand);
+
+        binding.tvTargetNumber.setText(String.valueOf(targetNumber));
+        for (int i = 0; i < 6; i++) {
+            TextView tv = (TextView) binding.numbersContainer.getChildAt(i);
+            tv.setText(String.valueOf(availableNumbers.get(i)));
+            tv.setEnabled(true);
+            tv.setAlpha(1.0f);
+        }
+        binding.btnStop.setVisibility(View.GONE);
+        binding.btnSubmit.setVisibility(View.VISIBLE);
+        binding.btnSubmit.setEnabled(true);
+        setInputEnabled(true);
+        if (binding.gameStatus.tvPlayer1Name != null) binding.gameStatus.tvPlayer1Name.setText("Ti");
+        if (binding.gameStatus.tvPlayer2Name != null) binding.gameStatus.tvPlayer2Name.setText("—");
+        player1Points = cumulativePoints;
+        updateScoreUI();
+        startGameTimer();
+
+        Toast.makeText(getContext(), "Cilj: " + targetNumber + " — imate 60 sekundi!", Toast.LENGTH_LONG).show();
+    }
+
+    private void notifyStandaloneFinished(int score) {
+        if (!isAdded()) return;
+        Bundle result = new Bundle();
+        result.putInt("points", score);
+        result.putString("game", "MOJ_BROJ");
+        getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
     }
 
     private void notifyGameFinished() {
