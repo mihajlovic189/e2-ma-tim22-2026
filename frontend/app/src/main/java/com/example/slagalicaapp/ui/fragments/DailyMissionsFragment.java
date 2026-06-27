@@ -49,9 +49,13 @@ public class DailyMissionsFragment extends Fragment {
 
         tvDate.setText("Danas: " + new SimpleDateFormat("dd. MMMM yyyy.", Locale.getDefault()).format(new Date()));
 
-        loadMissions();
-
         return view;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        loadMissions();
     }
 
     private void loadMissions() {

@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Source;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -57,18 +58,67 @@ public class DailyMissionsRepository {
     }
 
     public void refreshMissions() {
+        if (missionsLiveData == null) {
+            missionsLiveData = new MutableLiveData<>();
+        }
         FirebaseUser user = mAuth.getCurrentUser();
         if (user == null) {
             missionsLiveData.setValue(new DailyMissionsData());
             return;
         }
         String today = getToday();
-        db.collection("users").document(user.getUid()).get()
+        db.collection("users").document(user.getUid())
+                .get(Source.SERVER)
                 .addOnSuccessListener(doc -> {
                     DailyMissionsData data = parseMissions(doc, today);
-                    missionsLiveData.setValue(data);
+                    if (data.winMatch) {
+                        if (missionsLiveData != null) missionsLiveData.setValue(data);
+                    } else {
+                        checkWonMatchToday(user.getUid(), today, data);
+                    }
                 })
-                .addOnFailureListener(e -> {});
+                .addOnFailureListener(e -> {
+                    db.collection("users").document(user.getUid()).get()
+                            .addOnSuccessListener(doc -> {
+                                DailyMissionsData data = parseMissions(doc, today);
+                                if (data.winMatch) {
+                                    if (missionsLiveData != null) missionsLiveData.setValue(data);
+                                } else {
+                                    checkWonMatchToday(user.getUid(), today, data);
+                                }
+                            });
+                });
+    }
+
+    private void checkWonMatchToday(String uid, String today, DailyMissionsData data) {
+        long todayStartMs = getTodayStartMs();
+        db.collection("slagalica_match_results")
+                .whereEqualTo("winnerUid", uid)
+                .whereGreaterThanOrEqualTo("timestamp", todayStartMs)
+                .limit(1)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (!querySnapshot.isEmpty()) {
+                        data.winMatch = true;
+                        Map<String, Object> update = new HashMap<>();
+                        update.put("dailyMissions.date", today);
+                        update.put("dailyMissions.winMatch", true);
+                        db.collection("users").document(uid).update(update);
+                    }
+                    if (missionsLiveData != null) missionsLiveData.setValue(data);
+                })
+                .addOnFailureListener(e -> {
+                    if (missionsLiveData != null) missionsLiveData.setValue(data);
+                });
+    }
+
+    private long getTodayStartMs() {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
     }
 
     private DailyMissionsData parseMissions(DocumentSnapshot doc, String today) {
