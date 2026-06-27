@@ -54,10 +54,19 @@
             android:backgroundTint="#1E3A5F" />
 
         <Button
+            android:id="@+id/btnLeaderboard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="🏆  Rang lista"
+            android:textColor="@color/text"
+            android:backgroundTint="#1E3A5F" />
+
+        <Button
             android:id="@+id/btnRegionalChallenges"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🏆 REGIONALNI IZAZOVI"
+            android:text="⚔  Regionalni izazovi"
             android:backgroundTint="#FF5722"
             android:textColor="#FFFFFF" />
 

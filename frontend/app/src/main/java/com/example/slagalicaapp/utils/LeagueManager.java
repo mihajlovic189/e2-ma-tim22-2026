@@ -64,4 +64,12 @@ public final class LeagueManager {
         if (index >= 0 && index < LEAGUES.size()) return LEAGUES.get(index);
         return LEAGUES.get(0);
     }
+
+    public static String iconForName(String leagueName) {
+        if (leagueName == null) return LEAGUES.get(0).icon;
+        for (League l : LEAGUES) {
+            if (l.name.equalsIgnoreCase(leagueName)) return l.icon;
+        }
+        return LEAGUES.get(0).icon;
+    }
 }

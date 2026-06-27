@@ -41,14 +41,15 @@ public class PlayerLeaderboardAdapter extends RecyclerView.Adapter<PlayerLeaderb
     public int getItemCount() { return items.size(); }
 
     static class VH extends RecyclerView.ViewHolder {
-        final TextView tvRank, tvUsername, tvStars, tvMe;
+        final TextView tvRank, tvUsername, tvStars, tvMe, tvLeagueIcon;
 
         VH(View v) {
             super(v);
-            tvRank     = v.findViewById(R.id.tvPlayerRank);
-            tvUsername = v.findViewById(R.id.tvPlayerUsername);
-            tvStars    = v.findViewById(R.id.tvPlayerStars);
-            tvMe       = v.findViewById(R.id.tvMeBadge);
+            tvRank       = v.findViewById(R.id.tvPlayerRank);
+            tvUsername   = v.findViewById(R.id.tvPlayerUsername);
+            tvStars      = v.findViewById(R.id.tvPlayerStars);
+            tvMe         = v.findViewById(R.id.tvMeBadge);
+            tvLeagueIcon = v.findViewById(R.id.tvLeagueIcon);
         }
 
         void bind(PlayerLeaderboardEntry e) {
@@ -63,6 +64,10 @@ public class PlayerLeaderboardAdapter extends RecyclerView.Adapter<PlayerLeaderb
             tvUsername.setText(e.getUsername());
             tvStars.setText(e.getMonthlyStars() + " ⭐");
             tvMe.setVisibility(e.isCurrentUser() ? View.VISIBLE : View.GONE);
+            if (tvLeagueIcon != null) {
+                String icon = e.getLeagueIcon();
+                tvLeagueIcon.setText(icon != null ? icon : "");
+            }
 
             int bg = e.isCurrentUser() ? Color.parseColor("#1E3A5F") : Color.parseColor("#111827");
             itemView.setBackgroundColor(bg);

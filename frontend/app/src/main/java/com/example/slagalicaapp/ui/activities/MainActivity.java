@@ -24,6 +24,7 @@ import com.example.slagalicaapp.SlagalicaApp;
 import com.example.slagalicaapp.data.firebase.MatchmakingManager;
 import com.example.slagalicaapp.data.models.GameInvite;
 import com.example.slagalicaapp.notifications.DemoNotificationTrigger;
+import com.example.slagalicaapp.repositories.LeaderboardRepository;
 import com.example.slagalicaapp.ui.fragments.HomeFragment;
 import com.example.slagalicaapp.ui.fragments.LoginFragment;
 import com.google.firebase.auth.FirebaseAuth;
@@ -191,6 +192,7 @@ public class MainActivity extends AppCompatActivity {
                         });
 
                 proveriIDodeliDnevneTokene();
+                new LeaderboardRepository().checkAndDistributeRewards(null);
             }
         };
         FirebaseAuth.getInstance().addAuthStateListener(authStateListener);

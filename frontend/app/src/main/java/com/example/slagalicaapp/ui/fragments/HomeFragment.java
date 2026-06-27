@@ -80,6 +80,12 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
+        binding.btnLeaderboard.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new LeaderboardFragment())
+                        .addToBackStack(null)
+                        .commit());
+
         binding.btnRegionalChallenges.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new ChallengesFragment())

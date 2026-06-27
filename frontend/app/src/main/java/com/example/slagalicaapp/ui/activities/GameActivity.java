@@ -27,7 +27,10 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class GameActivity extends AppCompatActivity {
@@ -408,6 +411,19 @@ public class GameActivity extends AppCompatActivity {
                     updates.put("totalStars", finalneZvezde);
                     updates.put("tokenCount", trenutniTokeni + nagradniTokeni);
 
+                    String currentWeek = getCurrentWeekId();
+                    String currentMonth = getCurrentMonthId();
+                    updates.put("cycleWeek", currentWeek);
+                    updates.put("cycleMonth", currentMonth);
+                    Long curWeekly = doc.getLong("weeklyStars");
+                    Long curMonthly = doc.getLong("monthlyStars");
+                    int newWeekly = Math.max(0, (curWeekly != null ? curWeekly.intValue() : 0) + razlikaZvezda);
+                    int newMonthly = Math.max(0, (curMonthly != null ? curMonthly.intValue() : 0) + razlikaZvezda);
+                    updates.put("weeklyStars", (long) newWeekly);
+                    updates.put("monthlyStars", (long) newMonthly);
+                    Long curGames = doc.getLong("totalGamesPlayed");
+                    updates.put("totalGamesPlayed", (curGames != null ? curGames : 0) + 1);
+
                     final int finalRazlika = razlikaZvezda;
                     final int finalNagrada = nagradniTokeni;
                     final boolean finalPobeda = samJaPobednik;
@@ -427,6 +443,18 @@ public class GameActivity extends AppCompatActivity {
                             .addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
                 })
                 .addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
+    }
+
+    private String getCurrentWeekId() {
+        Calendar cal = Calendar.getInstance();
+        cal.setFirstDayOfWeek(Calendar.MONDAY);
+        int week = cal.get(Calendar.WEEK_OF_YEAR);
+        int year = cal.get(Calendar.YEAR);
+        return String.format(Locale.US, "%d-W%02d", year, week);
+    }
+
+    private String getCurrentMonthId() {
+        return new SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(new java.util.Date());
     }
 
     private void ocistiSobuIAzurnoZavrsi() {

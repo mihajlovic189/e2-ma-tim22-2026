@@ -18,25 +18,41 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical"
-        android:layout_marginStart="10dp">
+        android:orientation="horizontal"
+        android:layout_marginStart="10dp"
+        android:gravity="center_vertical">
 
         <TextView
-            android:id="@+id/tvPlayerUsername"
+            android:id="@+id/tvLeagueIcon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/text"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textSize="18sp"
+            android:layout_marginEnd="6dp"
+            android:visibility="visible" />
 
-        <TextView
-            android:id="@+id/tvMeBadge"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Ja"
-            android:textSize="11sp"
-            android:textColor="#7C3AED"
-            android:visibility="gone" />
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvPlayerUsername"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvMeBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ja"
+                android:textSize="11sp"
+                android:textColor="#7C3AED"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
     <TextView
