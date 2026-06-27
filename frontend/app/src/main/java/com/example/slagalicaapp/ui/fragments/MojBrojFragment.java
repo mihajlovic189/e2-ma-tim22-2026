@@ -50,6 +50,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     private int player1Points = 0;
     private int cumulativePoints = 0;
     private int player2Points = 0;
+    private boolean iWon = false;
 
     private SensorManager sensorManager;
     private float acceleration = 0f;
@@ -213,12 +214,16 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
                             String winner;
                             if (forfeitBy != null && !forfeitBy.isEmpty()) {
                                 boolean iForfeited = forfeitBy.equals("player" + myPlayerNumber);
+                                iWon = !iForfeited;
                                 winner = iForfeited ? "Odustao si." : "Protivnik je odustao.";
                             } else if (p1Score > p2Score) {
+                                iWon = (myPlayerNumber == 1);
                                 winner = "Igrač 1 pobijedio!";
                             } else if (p2Score > p1Score) {
+                                iWon = (myPlayerNumber == 2);
                                 winner = "Igrač 2 pobijedio!";
                             } else {
+                                iWon = false;
                                 winner = "Neriješeno!";
                             }
 
@@ -422,6 +427,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
         if (!isAdded()) return;
         Bundle result = new Bundle();
         result.putString("game", "MOJ_BROJ");
+        result.putBoolean("iWon", iWon);
         getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
     }
 

@@ -93,7 +93,7 @@ public class GameActivity extends AppCompatActivity {
                     if (result.containsKey("points")) {
                         ukupniPoeniIzazova += result.getInt("points");
                     }
-                    handleSubGameFinished();
+                    handleSubGameFinished(result);
                 });
 
         if (challengeId != null) {
@@ -142,7 +142,7 @@ public class GameActivity extends AppCompatActivity {
         roomRef.addValueEventListener(roomListener);
     }
 
-    private void handleSubGameFinished() {
+    private void handleSubGameFinished(android.os.Bundle result) {
         // GRANANJE LOGIKE: Ako je izazov, igrač samostalno menja igre lokalno
         if (challengeId != null) {
             switch (currentSubGame) {
@@ -170,6 +170,9 @@ public class GameActivity extends AppCompatActivity {
             // Standardna 1v1 multiplayer logika (sinhronizovana preko baze)
             if (GAME_MOJ_BROJ.equals(currentSubGame)) {
                 if (roomListener != null) roomRef.removeEventListener(roomListener);
+                if (result.getBoolean("iWon", false)) {
+                    new DailyMissionsRepository().completeMission("winMatch", null);
+                }
                 persistFinalResultAndFinish(false);
                 return;
             }
