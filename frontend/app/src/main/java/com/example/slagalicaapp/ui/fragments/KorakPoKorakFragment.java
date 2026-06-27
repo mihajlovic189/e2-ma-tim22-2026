@@ -193,8 +193,9 @@ public class KorakPoKorakFragment extends Fragment {
 
                             if (hasNextRound && firebaseManager != null && myPlayerNumber == 1) {
                                 int nextActive = activePlayerNumber == 1 ? 2 : 1;
+                                KorakPoKorakItem nextItem = KorakPoKorakRepository.getRandomItem();
                                 new Handler().postDelayed(
-                                        () -> firebaseManager.startNextRoundIfReady(nextActive), 5000);
+                                        () -> firebaseManager.startNextRoundIfReady(nextActive, nextItem.solution, nextItem.steps), 5000);
                             }
                         });
                     }
@@ -230,6 +231,15 @@ public class KorakPoKorakFragment extends Fragment {
                 });
 
         firebaseManager.startListening();
+
+        // Player 1 guarantees both rounds have valid puzzle data from local repo,
+        // so isRoundReady() never fails due to missing/malformed pool items.
+        if (myPlayerNumber == 1) {
+            KorakPoKorakItem r1 = KorakPoKorakRepository.getRandomItem();
+            KorakPoKorakItem r2 = KorakPoKorakRepository.getRandomItem();
+            firebaseManager.writeRoundsData(r1.solution, r1.steps, r2.solution, r2.steps);
+        }
+
         loadPlayerNames();
     }
 

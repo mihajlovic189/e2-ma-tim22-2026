@@ -264,6 +264,7 @@ public class RegionRepository {
                         rollover.put("previousMonthlyStars", oldStars != null ? oldStars : 0L);
                         rollover.put("previousCycleMonth", oldMonth);
                         rollover.put("monthlyStars", 0L);
+                        rollover.put("monthlyGamesPlayed", 0L);
                         rollover.put("cycleMonth", currentMonth);
 
                         db.collection("users").document(user.getUid()).update(rollover)

@@ -181,7 +181,21 @@ public class KorakPoKorakManager {
         }
     }
 
-    public void startNextRoundIfReady(int nextActivePlayer) {
+    public void writeRoundsData(String r1Solution, java.util.List<String> r1Steps,
+                                 String r2Solution, java.util.List<String> r2Steps) {
+        Map<String, Object> update = new HashMap<>();
+        update.put("korakPoKorak/rounds/1/solution", r1Solution);
+        for (int i = 0; i < r1Steps.size(); i++) {
+            update.put("korakPoKorak/rounds/1/steps/" + i, r1Steps.get(i));
+        }
+        update.put("korakPoKorak/rounds/2/solution", r2Solution);
+        for (int i = 0; i < r2Steps.size(); i++) {
+            update.put("korakPoKorak/rounds/2/steps/" + i, r2Steps.get(i));
+        }
+        roomRef.updateChildren(update);
+    }
+
+    public void startNextRoundIfReady(int nextActivePlayer, String solution, java.util.List<String> steps) {
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
@@ -191,6 +205,7 @@ public class KorakPoKorakManager {
                 if (!"round_finished".equals(roundStatus)) return;
 
                 long sledecaRunda = roundVal + 1;
+                String roundKey = "korakPoKorak/rounds/" + sledecaRunda;
 
                 Map<String, Object> update = new HashMap<>();
                 update.put("korakPoKorak/currentRound", sledecaRunda);
@@ -200,6 +215,13 @@ public class KorakPoKorakManager {
                 update.put("korakPoKorak/lastWrongAnswer", null);
                 update.put("korakPoKorak/lastRoundSolved", null);
                 update.put("korakPoKorak/lastSolvedBy", null);
+                // Write puzzle data for round 2 so the listener's isRoundReady() check passes
+                update.put(roundKey + "/solution", solution);
+                if (steps != null) {
+                    for (int i = 0; i < steps.size(); i++) {
+                        update.put(roundKey + "/steps/" + i, steps.get(i));
+                    }
+                }
                 roomRef.updateChildren(update);
             }
 

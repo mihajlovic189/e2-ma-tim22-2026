@@ -9,7 +9,6 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
@@ -128,7 +127,7 @@ public class DailyMissionsRepository {
 
                     if (!wasAllBefore && data.allCompleted() && !data.rewardsClaimed) {
                         data.rewardsClaimed = true;
-                        starsAwarded = 15;
+                        starsAwarded = 6; // 3 for the mission itself + 3 bonus for completing all 4
                         tokensAwarded = 2;
                     } else if (!wasAlreadyCompleted) {
                         starsAwarded = 3;
@@ -144,18 +143,6 @@ public class DailyMissionsRepository {
                     if (starsAwarded > 0) {
                         Long curStars = doc.getLong("totalStars");
                         updates.put("totalStars", (curStars != null ? curStars : 0) + starsAwarded);
-
-                        // Also count mission stars toward weekly/monthly leaderboard cycles
-                        String currentWeek = getCurrentWeekId();
-                        String currentMonth = getCurrentMonthId();
-                        int baseWeekly = currentWeek.equals(doc.getString("cycleWeek")) && doc.getLong("weeklyStars") != null
-                                ? doc.getLong("weeklyStars").intValue() : 0;
-                        int baseMonthly = currentMonth.equals(doc.getString("cycleMonth")) && doc.getLong("monthlyStars") != null
-                                ? doc.getLong("monthlyStars").intValue() : 0;
-                        updates.put("cycleWeek", currentWeek);
-                        updates.put("cycleMonth", currentMonth);
-                        updates.put("weeklyStars", (long) (baseWeekly + starsAwarded));
-                        updates.put("monthlyStars", (long) (baseMonthly + starsAwarded));
                     }
                     if (tokensAwarded > 0) {
                         Long curTokens = doc.getLong("tokenCount");
@@ -179,18 +166,6 @@ public class DailyMissionsRepository {
 
     private String getToday() {
         return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-    }
-
-    private String getCurrentWeekId() {
-        Calendar cal = Calendar.getInstance();
-        cal.setFirstDayOfWeek(Calendar.MONDAY);
-        int week = cal.get(Calendar.WEEK_OF_YEAR);
-        int year = cal.get(Calendar.YEAR);
-        return String.format(Locale.US, "%d-W%02d", year, week);
-    }
-
-    private String getCurrentMonthId() {
-        return new SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(new Date());
     }
 
     private boolean bool(Object val) {

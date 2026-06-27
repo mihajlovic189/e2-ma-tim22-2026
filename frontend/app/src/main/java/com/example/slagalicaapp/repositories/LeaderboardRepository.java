@@ -62,6 +62,8 @@ public class LeaderboardRepository {
                 .addOnSuccessListener(snapshots -> {
                     List<PlayerLeaderboardEntry> entries = new ArrayList<>();
                     for (QueryDocumentSnapshot doc : snapshots) {
+                        Long gamesPlayed = doc.getLong("weeklyGamesPlayed");
+                        if (gamesPlayed == null || gamesPlayed == 0) continue; // spec: must play at least one game
                         String username = doc.getString("username");
                         if (username == null) continue;
                         Long ws = doc.getLong("weeklyStars");
@@ -91,6 +93,8 @@ public class LeaderboardRepository {
                 .addOnSuccessListener(snapshots -> {
                     List<PlayerLeaderboardEntry> entries = new ArrayList<>();
                     for (QueryDocumentSnapshot doc : snapshots) {
+                        Long gamesPlayed = doc.getLong("monthlyGamesPlayed");
+                        if (gamesPlayed == null || gamesPlayed == 0) continue; // spec: must play at least one game
                         String username = doc.getString("username");
                         if (username == null) continue;
                         Long ms = doc.getLong("monthlyStars");
@@ -149,6 +153,7 @@ public class LeaderboardRepository {
             int weeklyStars = ws != null ? ws.intValue() : 0;
             if (weeklyStars > 0) needWeekQuery = true;
             updates.put("weeklyStars", 0L);
+            updates.put("weeklyGamesPlayed", 0L);
             updates.put("cycleWeek", currentWeek);
         }
 
@@ -157,6 +162,7 @@ public class LeaderboardRepository {
             int monthlyStars = ms != null ? ms.intValue() : 0;
             if (monthlyStars > 0) needMonthQuery = true;
             updates.put("monthlyStars", 0L);
+            updates.put("monthlyGamesPlayed", 0L);
             updates.put("cycleMonth", currentMonth);
         }
 

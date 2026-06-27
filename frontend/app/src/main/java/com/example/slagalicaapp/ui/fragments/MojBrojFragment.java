@@ -123,7 +123,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
                                             (iAmActivePlayer ? "Ti biraš!" : "Protivnik bira brojeve"),
                                     Toast.LENGTH_SHORT).show();
 
-                            startAutoTargetTimer();
+                            if (iAmActivePlayer) startAutoTargetTimer();
                         });
                     }
 
@@ -135,7 +135,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
                             MojBrojFragment.this.targetNumber = targetNumber;
                             binding.tvTargetNumber.setText(String.valueOf(targetNumber));
                             stopCount = 1;
-                            startAutoNumbersTimer();
+                            if (iAmActivePlayer) startAutoNumbersTimer();
                         });
                     }
 

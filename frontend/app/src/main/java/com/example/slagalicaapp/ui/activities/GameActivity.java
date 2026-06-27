@@ -348,9 +348,17 @@ public class GameActivity extends AppCompatActivity {
                             DailyMissionsRepository missionsRepo = new DailyMissionsRepository();
                             if (!isFriendly) {
                                 if (currentUser.getUid().equals(result.winnerUid)) {
-                                    missionsRepo.completeMission("winMatch", null);
+                                    missionsRepo.completeMission("winMatch", new DailyMissionsRepository.MissionCallback() {
+                                        @Override public void onSuccess(boolean newlyCompleted) {
+                                            primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                        }
+                                        @Override public void onError(String error) {
+                                            primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                        }
+                                    });
+                                } else {
+                                    primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
                                 }
-                                primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
                             } else {
                                 missionsRepo.completeMission("friendlyMatch", null);
                                 Toast.makeText(GameActivity.this, "Prijateljska partija završena.", Toast.LENGTH_LONG).show();
@@ -431,6 +439,13 @@ public class GameActivity extends AppCompatActivity {
                     int newMonthly = Math.max(0, baseMonthly + razlikaZvezda);
                     updates.put("weeklyStars", (long) newWeekly);
                     updates.put("monthlyStars", (long) newMonthly);
+
+                    long baseWeeklyGames = currentWeek.equals(docCycleWeek) && doc.getLong("weeklyGamesPlayed") != null
+                            ? doc.getLong("weeklyGamesPlayed") : 0L;
+                    long baseMonthlyGames = currentMonth.equals(docCycleMonth) && doc.getLong("monthlyGamesPlayed") != null
+                            ? doc.getLong("monthlyGamesPlayed") : 0L;
+                    updates.put("weeklyGamesPlayed", baseWeeklyGames + 1);
+                    updates.put("monthlyGamesPlayed", baseMonthlyGames + 1);
                     Long curGames = doc.getLong("totalGamesPlayed");
                     updates.put("totalGamesPlayed", (curGames != null ? curGames : 0) + 1);
 
