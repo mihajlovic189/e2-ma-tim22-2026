@@ -63,6 +63,15 @@
             android:backgroundTint="#1E3A5F" />
 
         <Button
+            android:id="@+id/btnDailyMissions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="📋  Dnevne misije"
+            android:textColor="@color/text"
+            android:backgroundTint="#1E3A5F" />
+
+        <Button
             android:id="@+id/btnRegionalChallenges"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

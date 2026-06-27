@@ -6,6 +6,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.slagalicaapp.model.GameResult;
+import com.example.slagalicaapp.repositories.DailyMissionsRepository;
 import com.example.slagalicaapp.repositories.GameResultRepository;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.firebase.ChallengeManager; // DODATO
@@ -344,9 +345,14 @@ public class GameActivity extends AppCompatActivity {
 
                 gameResultRepository.saveGameResult(result, firestoreCollection)
                         .addOnSuccessListener(documentReference -> {
+                            DailyMissionsRepository missionsRepo = new DailyMissionsRepository();
                             if (!isFriendly) {
+                                if (currentUser.getUid().equals(result.winnerUid)) {
+                                    missionsRepo.completeMission("winMatch", null);
+                                }
                                 primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
                             } else {
+                                missionsRepo.completeMission("friendlyMatch", null);
                                 Toast.makeText(GameActivity.this, "Prijateljska partija završena.", Toast.LENGTH_LONG).show();
                                 ocistiSobuIAzurnoZavrsi();
                             }
@@ -417,8 +423,12 @@ public class GameActivity extends AppCompatActivity {
                     updates.put("cycleMonth", currentMonth);
                     Long curWeekly = doc.getLong("weeklyStars");
                     Long curMonthly = doc.getLong("monthlyStars");
-                    int newWeekly = Math.max(0, (curWeekly != null ? curWeekly.intValue() : 0) + razlikaZvezda);
-                    int newMonthly = Math.max(0, (curMonthly != null ? curMonthly.intValue() : 0) + razlikaZvezda);
+                    String docCycleWeek = doc.getString("cycleWeek");
+                    String docCycleMonth = doc.getString("cycleMonth");
+                    int baseWeekly = currentWeek.equals(docCycleWeek) && curWeekly != null ? curWeekly.intValue() : 0;
+                    int baseMonthly = currentMonth.equals(docCycleMonth) && curMonthly != null ? curMonthly.intValue() : 0;
+                    int newWeekly = Math.max(0, baseWeekly + razlikaZvezda);
+                    int newMonthly = Math.max(0, baseMonthly + razlikaZvezda);
                     updates.put("weeklyStars", (long) newWeekly);
                     updates.put("monthlyStars", (long) newMonthly);
                     Long curGames = doc.getLong("totalGamesPlayed");

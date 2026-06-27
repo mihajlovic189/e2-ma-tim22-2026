@@ -195,12 +195,12 @@ public class LeaderboardRepository {
                             db.collection("users").whereEqualTo("cycleMonth", storedMonth).get()
                                     .addOnSuccessListener(snapshots2 -> {
                                         int rank2 = computeUserRankFromSnapshots(snapshots2, "monthlyStars", uid);
-                                        Long ms = doc.getLong("monthlyStars");
-                                        int monthlyStars = ms != null ? ms.intValue() : 0;
                                         int tokens2 = getMonthlyRewardTokens(rank2);
                                         if (tokens2 > 0 && rank2 > 0) {
-                                            Long tc = doc.getLong("tokenCount");
-                                            updates.put("tokenCount", (tc != null ? tc : 0) + tokens2);
+                                            long base = updates.containsKey("tokenCount")
+                                                    ? ((Number) updates.get("tokenCount")).longValue()
+                                                    : (doc.getLong("tokenCount") != null ? doc.getLong("tokenCount") : 0L);
+                                            updates.put("tokenCount", base + tokens2);
                                             saveRewardNotification(uid, "mesečnoj", rank2, tokens2);
                                         }
                                         if (rank2 == 0 || rank2 > 3) {

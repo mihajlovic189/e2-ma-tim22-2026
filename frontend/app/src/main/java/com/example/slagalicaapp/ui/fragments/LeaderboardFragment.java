@@ -12,14 +12,18 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.slagalicaapp.R;
+import com.example.slagalicaapp.data.models.PlayerLeaderboardEntry;
 import com.example.slagalicaapp.ui.adapters.PlayerLeaderboardAdapter;
 import com.example.slagalicaapp.viewmodels.LeaderboardViewModel;
 
+import java.util.List;
 import java.util.Map;
 
 public class LeaderboardFragment extends Fragment {
@@ -35,6 +39,8 @@ public class LeaderboardFragment extends Fragment {
     private Button btnTabWeekly, btnTabMonthly;
     private Tab currentTab = Tab.WEEKLY;
     private CountDownTimer refreshTimer;
+    private LiveData<List<PlayerLeaderboardEntry>> currentLiveData;
+    private Observer<List<PlayerLeaderboardEntry>> currentObserver;
 
     @Nullable
     @Override
@@ -89,15 +95,19 @@ public class LeaderboardFragment extends Fragment {
     }
 
     private void loadData() {
+        if (currentLiveData != null && currentObserver != null) {
+            currentLiveData.removeObserver(currentObserver);
+        }
+
         tvCycleRange.setText(currentTab == Tab.WEEKLY
                 ? "Nedeljni ciklus: " + viewModel.getWeekDateRange()
                 : "Mesečni ciklus: " + viewModel.getMonthDateRange());
 
-        var liveData = currentTab == Tab.WEEKLY
+        currentLiveData = currentTab == Tab.WEEKLY
                 ? viewModel.getWeeklyLeaderboard()
                 : viewModel.getMonthlyLeaderboard();
 
-        liveData.observe(getViewLifecycleOwner(), entries -> {
+        currentObserver = entries -> {
             if (entries == null || entries.isEmpty()) {
                 recyclerView.setVisibility(View.GONE);
                 emptyView.setVisibility(View.VISIBLE);
@@ -106,7 +116,9 @@ public class LeaderboardFragment extends Fragment {
                 emptyView.setVisibility(View.GONE);
                 adapter.setItems(entries);
             }
-        });
+        };
+
+        currentLiveData.observe(getViewLifecycleOwner(), currentObserver);
     }
 
     private void updateTabVisuals() {

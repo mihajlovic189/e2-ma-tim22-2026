@@ -182,14 +182,18 @@ public class RegionRepository {
         FirebaseUser user = mAuth.getCurrentUser();
         String currentUid = user != null ? user.getUid() : "";
 
-        db.collection("users").whereEqualTo("region", region).get()
+        String currentMonth = getCurrentMonth();
+        db.collection("users")
+                .whereEqualTo("region", region)
+                .whereEqualTo("cycleMonth", currentMonth)
+                .get()
                 .addOnSuccessListener(snapshots -> {
                     List<PlayerLeaderboardEntry> entries = new ArrayList<>();
                     for (QueryDocumentSnapshot doc : snapshots) {
                         String username = doc.getString("username");
                         if (username == null) continue;
 
-                        Long ts = doc.getLong("totalStars");
+                        Long ts = doc.getLong("monthlyStars");
                         int stars = ts != null ? ts.intValue() : 0;
 
                         boolean isCurrentUser = doc.getId().equals(currentUid);
