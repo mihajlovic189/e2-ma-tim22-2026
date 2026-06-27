@@ -60,5 +60,15 @@ service cloud.firestore {
       allow read:   if request.auth != null;
       allow update, delete: if false;
     }
+
+    match /slagalica_match_results/{resultId} {
+      allow create: if request.auth != null;
+      allow read:   if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    match /users/{userId}/notifications/{notifId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }

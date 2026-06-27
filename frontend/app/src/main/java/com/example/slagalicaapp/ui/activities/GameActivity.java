@@ -374,8 +374,24 @@ public class GameActivity extends AppCompatActivity {
                             }
                         })
                         .addOnFailureListener(e -> {
-                            Log.e(TAG, "Greška pri čuvanju u Firestore", e);
-                            ocistiSobuIAzurnoZavrsi();
+                            Log.e(TAG, "Greška pri čuvanju u Firestore: " + e.getMessage(), e);
+                            // Economy/leaderboard update runs even if match-result save fails
+                            if (!isFriendly) {
+                                if (currentUser.getUid().equals(result.winnerUid)) {
+                                    new DailyMissionsRepository().completeMission("winMatch", new DailyMissionsRepository.MissionCallback() {
+                                        @Override public void onSuccess(boolean newlyCompleted) {
+                                            primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                        }
+                                        @Override public void onError(String error) {
+                                            primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                        }
+                                    });
+                                } else {
+                                    primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                }
+                            } else {
+                                ocistiSobuIAzurnoZavrsi();
+                            }
                         });
             }
 
@@ -479,9 +495,15 @@ public class GameActivity extends AppCompatActivity {
                                 Toast.makeText(GameActivity.this, poruka, Toast.LENGTH_LONG).show();
                                 ocistiSobuIAzurnoZavrsi();
                             })
-                            .addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "primeniEkonomiju: update failed: " + e.getMessage(), e);
+                                ocistiSobuIAzurnoZavrsi();
+                            });
                 })
-                .addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "primeniEkonomiju: doc read failed: " + e.getMessage(), e);
+                    ocistiSobuIAzurnoZavrsi();
+                });
     }
 
     private String getCurrentWeekId() {
