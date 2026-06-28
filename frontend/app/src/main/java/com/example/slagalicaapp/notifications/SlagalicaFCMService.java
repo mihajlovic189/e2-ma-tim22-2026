@@ -5,7 +5,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.example.slagalicaapp.SlagalicaApp;
-import com.example.slagalicaapp.repositories.NotificationStore;
+import com.example.slagalicaapp.repositories.NotificationRepository;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -36,8 +36,9 @@ public class SlagalicaFCMService extends FirebaseMessagingService {
         if (title != null && body != null) {
             String channel = channelForType(type);
             AppNotificationManager.show(getApplicationContext(), channel, title, body);
-            NotificationStore.save(getApplicationContext(), title, body, type);
-            Log.d(TAG, "Notification saved locally: type=" + type);
+            // Save to Firestore notification history
+            new NotificationRepository().save(title, body, type);
+            Log.d(TAG, "Notification saved to Firestore: type=" + type);
         }
     }
 

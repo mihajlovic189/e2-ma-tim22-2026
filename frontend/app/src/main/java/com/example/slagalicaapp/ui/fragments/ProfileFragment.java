@@ -171,7 +171,7 @@ public class ProfileFragment extends Fragment {
         if (!isAdded() || getContext() == null) return;
 
         boolean promoted = isPromotion(from, to);
-        String title   = promoted ? "🎉 Napredovanje u ligi!" : "⬇ Pad u ligi";
+        String title   = promoted ? "Napredovanje u ligi!" : "Pad u ligi";
         String message = promoted
                 ? "Čestitamo! Napredovao si iz lige\n\"" + from + "\"\nu ligu\n\"" + to + "\"!"
                 : "Pao si iz lige\n\"" + from + "\"\nu ligu\n\"" + to + "\".";
@@ -181,6 +181,19 @@ public class ProfileFragment extends Fragment {
                 .setMessage(message)
                 .setPositiveButton("U redu", null)
                 .show();
+
+        // Save notification to history and update Firestore so it doesn't trigger again
+        com.example.slagalicaapp.repositories.NotificationRepository repo =
+                new com.example.slagalicaapp.repositories.NotificationRepository();
+        repo.save(title, message.replace("\n", " "), "other");
+
+        com.google.firebase.auth.FirebaseUser user =
+                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").document(user.getUid())
+                    .update("leagueName", to);
+        }
     }
 
     private boolean isPromotion(String from, String to) {

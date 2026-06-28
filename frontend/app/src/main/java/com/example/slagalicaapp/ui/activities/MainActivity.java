@@ -23,8 +23,11 @@ import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.SlagalicaApp;
 import com.example.slagalicaapp.data.firebase.MatchmakingManager;
 import com.example.slagalicaapp.data.models.GameInvite;
-import com.example.slagalicaapp.notifications.DemoNotificationTrigger;
+import com.example.slagalicaapp.notifications.AppNotificationManager;
 import com.example.slagalicaapp.repositories.LeaderboardRepository;
+import com.example.slagalicaapp.repositories.NotificationRepository;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.example.slagalicaapp.ui.fragments.HomeFragment;
 import com.example.slagalicaapp.ui.fragments.LoginFragment;
 import com.google.firebase.auth.FirebaseAuth;
@@ -45,6 +48,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int INVITE_NOTIF_ID = 9001;
     private com.google.firebase.database.ChildEventListener backgroundChatListener;
     private com.google.firebase.database.DatabaseReference backgroundChatRef;
+    private long chatListenerStartTime = 0L;
+    private ListenerRegistration firestoreNotifListener;
+    private long lastNotifCheckTime = 0L;
 
     private static final Map<String, String> GAME_LABELS = new LinkedHashMap<>();
     static {
@@ -70,9 +76,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean             isInForeground;
 
     private final ActivityResultLauncher<String> notifPermLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
-                if (granted) sendDemos();
-            });
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> { });
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -182,17 +186,17 @@ public class MainActivity extends AppCompatActivity {
                         .collection("users").document(uid)
                         .get()
                         .addOnSuccessListener(documentSnapshot -> {
+                            String region = "Global";
                             if (documentSnapshot != null && documentSnapshot.exists()) {
-                                String region = documentSnapshot.getString("region");
-                                if (region != null && !region.trim().isEmpty()) {
-
-                                    startBackgroundChatNotificationListener(uid, region);
-                                }
+                                String r = documentSnapshot.getString("region");
+                                if (r != null && !r.trim().isEmpty()) region = r;
                             }
+                            startBackgroundChatNotificationListener(uid, region);
                         });
 
                 proveriIDodeliDnevneTokene();
-                new LeaderboardRepository().checkAndDistributeRewards(null);
+                new LeaderboardRepository().checkAndDistributeRewards(MainActivity.this, null);
+                startFirestoreNotifListener(uid);
             }
         };
         FirebaseAuth.getInstance().addAuthStateListener(authStateListener);
@@ -203,6 +207,10 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
         if (authStateListener != null) {
             FirebaseAuth.getInstance().removeAuthStateListener(authStateListener);
+        }
+        if (firestoreNotifListener != null) {
+            firestoreNotifListener.remove();
+            firestoreNotifListener = null;
         }
     }
 
@@ -401,6 +409,41 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Notification (background) ─────────────────────────────────────────────
 
+    private void startFirestoreNotifListener(String uid) {
+        if (firestoreNotifListener != null) return;
+        lastNotifCheckTime = System.currentTimeMillis();
+        firestoreNotifListener = FirebaseFirestore.getInstance()
+                .collection("users").document(uid)
+                .collection("notifications")
+                .whereEqualTo("read", false)
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null || snapshots == null) return;
+                    for (var change : snapshots.getDocumentChanges()) {
+                        if (change.getType() != com.google.firebase.firestore.DocumentChange.Type.ADDED) continue;
+                        var doc = change.getDocument();
+                        Long ts = doc.getLong("timestamp");
+                        if (ts == null || ts <= lastNotifCheckTime) continue;
+                        String title = doc.getString("title");
+                        String body  = doc.getString("body");
+                        String type  = doc.getString("type");
+                        if (title == null || body == null) continue;
+                        String channel = channelForType(type);
+                        AppNotificationManager.show(MainActivity.this, channel, title, body);
+                    }
+                    lastNotifCheckTime = System.currentTimeMillis();
+                });
+    }
+
+    private String channelForType(String type) {
+        if (type == null) return SlagalicaApp.CHANNEL_OTHER;
+        switch (type) {
+            case "chat":    return SlagalicaApp.CHANNEL_CHAT;
+            case "ranking": return SlagalicaApp.CHANNEL_RANKING;
+            case "rewards": return SlagalicaApp.CHANNEL_REWARDS;
+            default:        return SlagalicaApp.CHANNEL_OTHER;
+        }
+    }
+
     private void postInviteNotification(GameInvite invite) {
         pendingInvite = invite;
         String label = GAME_LABELS.getOrDefault(invite.getGameType(), invite.getGameType());
@@ -423,6 +466,10 @@ public class MainActivity extends AppCompatActivity {
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
                 .notify(INVITE_NOTIF_ID, nb.build());
 
+        // Save to in-app notification history for the recipient
+        String inviteBody = invite.getFromName() + " te poziva na " + label;
+        new NotificationRepository().save("Poziv na igru", inviteBody, "other");
+
         watchInviteStatusForReceiver(invite);
     }
 
@@ -431,19 +478,16 @@ public class MainActivity extends AppCompatActivity {
     private void requestNotifPermissionAndSendDemos() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                    == PackageManager.PERMISSION_GRANTED) {
-                sendDemos();
-            } else {
+                    != PackageManager.PERMISSION_GRANTED) {
                 notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
             }
-        } else {
-            sendDemos();
         }
     }
 
     private void startBackgroundChatNotificationListener(String myUid, String region) {
         if (backgroundChatListener != null) return;
 
+        chatListenerStartTime = System.currentTimeMillis();
         backgroundChatRef = FirebaseDatabase.getInstance().getReference()
                 .child("regional_chats").child(region);
 
@@ -451,7 +495,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
                 Long timestamp = snapshot.child("timestamp").getValue(Long.class);
-                if (timestamp == null || (System.currentTimeMillis() - timestamp) > 10_000) {
+                if (timestamp == null || timestamp < chatListenerStartTime) {
                     return;
                 }
 
@@ -474,28 +518,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void prikažiLokalnuChatNotifikaciju(String naslov, String poruka) {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent,
-                PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
-
-        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, SlagalicaApp.CHANNEL_CHAT)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Nova poruka od: " + naslov)
-                .setContentText(poruka)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
-
-        if (notificationManager != null) {
-            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
-        }
+        String title = "Nova poruka od: " + naslov;
+        AppNotificationManager.show(this, SlagalicaApp.CHANNEL_CHAT, title, poruka);
+        // Also save to in-app notification history
+        new NotificationRepository().save(title, poruka, "chat");
     }
 
-    private void sendDemos() {
-        DemoNotificationTrigger.sendDemoNotifications(this);
-    }
 }

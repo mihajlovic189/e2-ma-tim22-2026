@@ -1,9 +1,13 @@
 package com.example.slagalicaapp.repositories;
 
+import android.content.Context;
+
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.slagalicaapp.SlagalicaApp;
 import com.example.slagalicaapp.data.models.PlayerLeaderboardEntry;
+import com.example.slagalicaapp.notifications.AppNotificationManager;
 import com.example.slagalicaapp.utils.LeagueManager;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -115,6 +119,10 @@ public class LeaderboardRepository {
     }
 
     public void checkAndDistributeRewards(Runnable onRewardReady) {
+        checkAndDistributeRewards(null, onRewardReady);
+    }
+
+    public void checkAndDistributeRewards(Context context, Runnable onRewardReady) {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user == null) { if (onRewardReady != null) onRewardReady.run(); return; }
         String uid = user.getUid();
@@ -136,14 +144,14 @@ public class LeaderboardRepository {
             }
 
             processCycleEnd(uid, doc, currentWeek, currentMonth,
-                    storedWeek, storedMonth, 0, 0, onRewardReady);
+                    storedWeek, storedMonth, 0, 0, context, onRewardReady);
         }).addOnFailureListener(e -> { if (onRewardReady != null) onRewardReady.run(); });
     }
 
     private void processCycleEnd(String uid, com.google.firebase.firestore.DocumentSnapshot doc,
                                   String currentWeek, String currentMonth,
                                   String storedWeek, String storedMonth,
-                                  int weekRank, int monthRank, Runnable onRewardReady) {
+                                  int weekRank, int monthRank, Context context, Runnable onRewardReady) {
         Map<String, Object> updates = new HashMap<>();
         boolean needWeekQuery = false;
         boolean needMonthQuery = false;
@@ -173,7 +181,7 @@ public class LeaderboardRepository {
 
         applyCycleUpdates(uid, doc, updates, currentWeek, currentMonth,
                 storedWeek, storedMonth, needWeekQuery, needMonthQuery,
-                weekRank, monthRank, onRewardReady);
+                weekRank, monthRank, context, onRewardReady);
     }
 
     private void applyCycleUpdates(String uid, com.google.firebase.firestore.DocumentSnapshot doc,
@@ -181,7 +189,7 @@ public class LeaderboardRepository {
                                     String currentWeek, String currentMonth,
                                     String storedWeek, String storedMonth,
                                     boolean needWeekQuery, boolean needMonthQuery,
-                                    int weekRank, int monthRank, Runnable onRewardReady) {
+                                    int weekRank, int monthRank, Context context, Runnable onRewardReady) {
         Runnable applyAndFinish = () -> applyUpdates(uid, updates, onRewardReady);
 
         if (needWeekQuery) {
@@ -195,7 +203,7 @@ public class LeaderboardRepository {
                         if (tokens > 0 && rank > 0) {
                             Long tc = doc.getLong("tokenCount");
                             updates.put("tokenCount", (tc != null ? tc : 0) + tokens);
-                            saveRewardNotification(uid, "nedeljnoj", rank, tokens);
+                            saveRewardNotification(uid, "nedeljnoj", rank, tokens, context);
                         }
                         if (needMonthQuery) {
                             db.collection("users").whereEqualTo("cycleMonth", storedMonth).get()
@@ -207,7 +215,7 @@ public class LeaderboardRepository {
                                                     ? ((Number) updates.get("tokenCount")).longValue()
                                                     : (doc.getLong("tokenCount") != null ? doc.getLong("tokenCount") : 0L);
                                             updates.put("tokenCount", base + tokens2);
-                                            saveRewardNotification(uid, "mesečnoj", rank2, tokens2);
+                                            saveRewardNotification(uid, "mesečnoj", rank2, tokens2, context);
                                         }
                                         if (rank2 == 0 || rank2 > 3) {
                                             Long ts = doc.getLong("totalStars");
@@ -231,7 +239,7 @@ public class LeaderboardRepository {
                         if (tokens > 0 && rank > 0) {
                             Long tc = doc.getLong("tokenCount");
                             updates.put("tokenCount", (tc != null ? tc : 0) + tokens);
-                            saveRewardNotification(uid, "mesečnoj", rank, tokens);
+                            saveRewardNotification(uid, "mesečnoj", rank, tokens, context);
                         }
                         if (rank == 0 || rank > 3) {
                             Long ts = doc.getLong("totalStars");
@@ -288,17 +296,22 @@ public class LeaderboardRepository {
         return 0;
     }
 
-    private void saveRewardNotification(String uid, String cycleType, int rank, int tokens) {
+    private void saveRewardNotification(String uid, String cycleType, int rank, int tokens, Context context) {
+        String title = "Nagrada za plasman!";
+        String body = "Osvojili ste " + rank + ". mesto na " + cycleType + " rang listi! Dobili ste " + tokens + " tokena!";
         Map<String, Object> notif = new HashMap<>();
         notif.put("type", "ranking");
-        notif.put("title", "Nagrada za plasman!");
-        notif.put("body", "Osvojili ste " + rank + ". mesto na " + cycleType + " rang listi! Dobili ste " + tokens + " tokena!");
+        notif.put("title", title);
+        notif.put("body", body);
         notif.put("timestamp", System.currentTimeMillis());
         notif.put("read", false);
         notif.put("rewardRank", rank);
         notif.put("rewardTokens", tokens);
         notif.put("cycleType", cycleType);
         db.collection("users").document(uid).collection("notifications").add(notif);
+        if (context != null) {
+            AppNotificationManager.show(context, SlagalicaApp.CHANNEL_RANKING, title, body);
+        }
     }
 
     public LiveData<Map<String, Object>> getPendingReward() {

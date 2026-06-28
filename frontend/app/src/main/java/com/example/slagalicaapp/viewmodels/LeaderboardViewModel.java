@@ -1,5 +1,7 @@
 package com.example.slagalicaapp.viewmodels;
 
+import android.content.Context;
+
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModel;
 
@@ -30,7 +32,11 @@ public class LeaderboardViewModel extends ViewModel {
     }
 
     public void checkAndDistributeRewards(Runnable onDone) {
-        repo.checkAndDistributeRewards(onDone);
+        repo.checkAndDistributeRewards(null, onDone);
+    }
+
+    public void checkAndDistributeRewards(Context context, Runnable onDone) {
+        repo.checkAndDistributeRewards(context, onDone);
     }
 
     public LiveData<Map<String, Object>> getPendingReward() {

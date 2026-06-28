@@ -68,7 +68,10 @@ service cloud.firestore {
     }
 
     match /users/{userId}/notifications/{notifId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Any authenticated user may create a notification for another user (friend-added, etc.)
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

@@ -66,7 +66,7 @@ public class LeaderboardFragment extends Fragment {
         btnTabWeekly.setOnClickListener(v -> switchTab(Tab.WEEKLY));
         btnTabMonthly.setOnClickListener(v -> switchTab(Tab.MONTHLY));
 
-        viewModel.checkAndDistributeRewards(() -> {
+        viewModel.checkAndDistributeRewards(requireContext(), () -> {
             if (isAdded()) {
                 loadData();
                 checkForRewardDialog();
