@@ -71,7 +71,13 @@ public class NotificationsFragment extends Fragment {
         recyclerView.setAdapter(adapter);
 
         if (btnMarkAll != null) {
-            btnMarkAll.setOnClickListener(v -> repo.oznacSveKaoProcitane());
+            btnMarkAll.setOnClickListener(v -> {
+                repo.oznacSveKaoProcitane();
+                for (NotificationModel n : allNotifications) {
+                    n.setRead(true);
+                }
+                applyFilter();
+            });
         }
 
         bindTabButtons(view);
@@ -201,22 +207,44 @@ public class NotificationsFragment extends Fragment {
 
     private void handleAction(NotificationModel n) {
         if (!isAdded()) return;
-        androidx.fragment.app.FragmentManager fm = requireActivity().getSupportFragmentManager();
+
         switch (n.getType()) {
-            case "chat":
+            case "chat": {
+                androidx.fragment.app.FragmentManager fm = requireActivity().getSupportFragmentManager();
                 fm.beginTransaction()
                         .replace(R.id.fragment_container, new RegionalChatFragment())
                         .addToBackStack(null)
                         .commit();
                 break;
-            case "ranking":
+            }
+            case "ranking": {
+                androidx.fragment.app.FragmentManager fm = requireActivity().getSupportFragmentManager();
                 fm.beginTransaction()
                         .replace(R.id.fragment_container, new LeaderboardFragment())
                         .addToBackStack(null)
                         .commit();
                 break;
-            default:
+            }
+            case "rewards": {
+                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle(n.getTitle())
+                        .setMessage(n.getBody())
+                        .setPositiveButton("Preuzmi", (d, w) -> {
+                            d.dismiss();
+                        })
+                        .setCancelable(true)
+                        .show();
                 break;
+            }
+            default: {
+                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle(n.getTitle())
+                        .setMessage(n.getBody())
+                        .setPositiveButton("OK", (d, w) -> d.dismiss())
+                        .setCancelable(true)
+                        .show();
+                break;
+            }
         }
     }
 }

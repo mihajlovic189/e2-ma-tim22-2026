@@ -11,7 +11,10 @@ public class SlagalicaApp extends Application {
     public static final String CHANNEL_RANKING = "channel_ranking";
     public static final String CHANNEL_REWARDS = "channel_rewards";
     public static final String CHANNEL_OTHER   = "channel_other";
-    public static boolean isUserInChatScreen = false;
+    public static boolean isUserInChatScreen    = false;
+    public static boolean isAppInForeground    = false;
+    /** True while MainActivity's RTDB chat listener is active (app process alive, not killed). */
+    public static boolean isChatListenerRunning = false;
 
     @Override
     public void onCreate() {

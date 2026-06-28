@@ -300,7 +300,7 @@ public class LeaderboardRepository {
         String title = "Nagrada za plasman!";
         String body = "Osvojili ste " + rank + ". mesto na " + cycleType + " rang listi! Dobili ste " + tokens + " tokena!";
         Map<String, Object> notif = new HashMap<>();
-        notif.put("type", "ranking");
+        notif.put("type", "rewards");
         notif.put("title", title);
         notif.put("body", body);
         notif.put("timestamp", System.currentTimeMillis());
@@ -320,7 +320,7 @@ public class LeaderboardRepository {
         if (user == null) { result.setValue(null); return result; }
 
         db.collection("users").document(user.getUid()).collection("notifications")
-                .whereEqualTo("type", "ranking")
+                .whereEqualTo("type", "rewards")
                 .whereEqualTo("read", false)
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .limit(1)

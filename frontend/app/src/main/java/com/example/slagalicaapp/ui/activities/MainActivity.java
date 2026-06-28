@@ -26,12 +26,12 @@ import com.example.slagalicaapp.data.models.GameInvite;
 import com.example.slagalicaapp.notifications.AppNotificationManager;
 import com.example.slagalicaapp.repositories.LeaderboardRepository;
 import com.example.slagalicaapp.repositories.NotificationRepository;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
 import com.example.slagalicaapp.ui.fragments.HomeFragment;
 import com.example.slagalicaapp.ui.fragments.LoginFragment;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -49,8 +49,6 @@ public class MainActivity extends AppCompatActivity {
     private com.google.firebase.database.ChildEventListener backgroundChatListener;
     private com.google.firebase.database.DatabaseReference backgroundChatRef;
     private long chatListenerStartTime = 0L;
-    private ListenerRegistration firestoreNotifListener;
-    private long lastNotifCheckTime = 0L;
 
     private static final Map<String, String> GAME_LABELS = new LinkedHashMap<>();
     static {
@@ -152,6 +150,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         isInForeground = true;
+        com.example.slagalicaapp.SlagalicaApp.isAppInForeground = true;
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(INVITE_NOTIF_ID);
 
         if (pendingInvite != null && pendingInviteId != null) {
@@ -165,6 +164,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         isInForeground = false;
+        com.example.slagalicaapp.SlagalicaApp.isAppInForeground = false;
     }
 
     @Override
@@ -182,6 +182,16 @@ public class MainActivity extends AppCompatActivity {
 
                 startGlobalInviteListener(uid);
 
+                // Save FCM token so cloud functions can send direct notifications
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
+                        .addOnSuccessListener(token -> {
+                            if (token != null) {
+                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                        .collection("users").document(uid)
+                                        .update("fcmToken", token);
+                            }
+                        });
+
                 com.google.firebase.firestore.FirebaseFirestore.getInstance()
                         .collection("users").document(uid)
                         .get()
@@ -191,12 +201,16 @@ public class MainActivity extends AppCompatActivity {
                                 String r = documentSnapshot.getString("region");
                                 if (r != null && !r.trim().isEmpty()) region = r;
                             }
+                            // Subscribe to chat topic so FCM messages reach this device
+                            // even if the user never opened the chat screen
+                            String topicName = "chat_" + region.replace(" ", "_");
+                            com.google.firebase.messaging.FirebaseMessaging.getInstance()
+                                    .subscribeToTopic(topicName);
                             startBackgroundChatNotificationListener(uid, region);
                         });
 
                 proveriIDodeliDnevneTokene();
                 new LeaderboardRepository().checkAndDistributeRewards(MainActivity.this, null);
-                startFirestoreNotifListener(uid);
             }
         };
         FirebaseAuth.getInstance().addAuthStateListener(authStateListener);
@@ -207,10 +221,6 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
         if (authStateListener != null) {
             FirebaseAuth.getInstance().removeAuthStateListener(authStateListener);
-        }
-        if (firestoreNotifListener != null) {
-            firestoreNotifListener.remove();
-            firestoreNotifListener = null;
         }
     }
 
@@ -223,6 +233,7 @@ public class MainActivity extends AppCompatActivity {
             backgroundChatRef.removeEventListener(backgroundChatListener);
             backgroundChatListener = null;
         }
+        SlagalicaApp.isChatListenerRunning = false;
     }
 
     // ── Global invite listener ────────────────────────────────────────────────
@@ -407,43 +418,6 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    // ── Notification (background) ─────────────────────────────────────────────
-
-    private void startFirestoreNotifListener(String uid) {
-        if (firestoreNotifListener != null) return;
-        lastNotifCheckTime = System.currentTimeMillis();
-        firestoreNotifListener = FirebaseFirestore.getInstance()
-                .collection("users").document(uid)
-                .collection("notifications")
-                .whereEqualTo("read", false)
-                .addSnapshotListener((snapshots, e) -> {
-                    if (e != null || snapshots == null) return;
-                    for (var change : snapshots.getDocumentChanges()) {
-                        if (change.getType() != com.google.firebase.firestore.DocumentChange.Type.ADDED) continue;
-                        var doc = change.getDocument();
-                        Long ts = doc.getLong("timestamp");
-                        if (ts == null || ts <= lastNotifCheckTime) continue;
-                        String title = doc.getString("title");
-                        String body  = doc.getString("body");
-                        String type  = doc.getString("type");
-                        if (title == null || body == null) continue;
-                        String channel = channelForType(type);
-                        AppNotificationManager.show(MainActivity.this, channel, title, body);
-                    }
-                    lastNotifCheckTime = System.currentTimeMillis();
-                });
-    }
-
-    private String channelForType(String type) {
-        if (type == null) return SlagalicaApp.CHANNEL_OTHER;
-        switch (type) {
-            case "chat":    return SlagalicaApp.CHANNEL_CHAT;
-            case "ranking": return SlagalicaApp.CHANNEL_RANKING;
-            case "rewards": return SlagalicaApp.CHANNEL_REWARDS;
-            default:        return SlagalicaApp.CHANNEL_OTHER;
-        }
-    }
-
     private void postInviteNotification(GameInvite invite) {
         pendingInvite = invite;
         String label = GAME_LABELS.getOrDefault(invite.getGameType(), invite.getGameType());
@@ -495,16 +469,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
                 Long timestamp = snapshot.child("timestamp").getValue(Long.class);
-                if (timestamp == null || timestamp < chatListenerStartTime) {
-                    return;
-                }
+                if (timestamp == null || timestamp < chatListenerStartTime) return;
 
-                String senderId = snapshot.child("senderId").getValue(String.class);
+                String senderId   = snapshot.child("senderId").getValue(String.class);
                 String senderName = snapshot.child("senderName").getValue(String.class);
-                String text = snapshot.child("text").getValue(String.class);
+                String text       = snapshot.child("text").getValue(String.class);
+                String msgId      = snapshot.getKey();
 
                 if (senderId != null && !senderId.equals(myUid) && !SlagalicaApp.isUserInChatScreen) {
-                    prikažiLokalnuChatNotifikaciju(senderName, text);
+                    prikažiLokalnuChatNotifikaciju(senderName, text, msgId);
                 }
             }
 
@@ -514,14 +487,35 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onCancelled(@NonNull DatabaseError error) {}
         };
 
-        backgroundChatRef.limitToLast(1).addChildEventListener(backgroundChatListener);
+        SlagalicaApp.isChatListenerRunning = true;
+        backgroundChatRef.limitToLast(50).addChildEventListener(backgroundChatListener);
     }
 
-    private void prikažiLokalnuChatNotifikaciju(String naslov, String poruka) {
-        String title = "Nova poruka od: " + naslov;
-        AppNotificationManager.show(this, SlagalicaApp.CHANNEL_CHAT, title, poruka);
-        // Also save to in-app notification history
-        new NotificationRepository().save(title, poruka, "chat");
+    private void prikažiLokalnuChatNotifikaciju(String senderName, String text, String msgId) {
+        if (senderName == null || text == null || msgId == null) return;
+
+        String title = "Nova poruka od: " + senderName;
+
+        // Show system notification if app is not visible
+        if (!SlagalicaApp.isAppInForeground) {
+            AppNotificationManager.show(getApplicationContext(),
+                    SlagalicaApp.CHANNEL_CHAT, title, text);
+        }
+
+        // Save to Firestore using msgId as document ID so the cloud function write
+        // (if deployed) lands on the same document rather than creating a duplicate.
+        FirebaseUser me = FirebaseAuth.getInstance().getCurrentUser();
+        if (me == null) return;
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("title", title);
+        data.put("body", text);
+        data.put("type", "chat");
+        data.put("timestamp", System.currentTimeMillis());
+        data.put("read", false);
+        FirebaseFirestore.getInstance()
+                .collection("users").document(me.getUid())
+                .collection("notifications").document(msgId)
+                .set(data, SetOptions.merge());
     }
 
 }
