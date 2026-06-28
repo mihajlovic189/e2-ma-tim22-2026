@@ -39,15 +39,12 @@ public class SlagalicaFCMService extends FirebaseMessagingService {
 
         if ("direct_fcm".equals(source)) {
             // Cloud function already wrote this to Firestore — do NOT save again.
-            // The client-side listeners (RTDB for chat, Firestore for everything else)
-            // show the system notification while the app process is alive.
-            // Only show it here when the app was killed (listeners not running).
-            boolean clientHandling = "chat".equals(type)
-                    ? SlagalicaApp.isChatListenerRunning
-                    : SlagalicaApp.isNotifListenerRunning;
-            if (!SlagalicaApp.isAppInForeground && !clientHandling) {
+            // FCM is the sole provider of system notifications when app is not visible.
+            // (Relying on client-side listeners for this is unreliable because Android
+            // can throttle or drop background network connections in Doze/standby mode.)
+            if (!SlagalicaApp.isAppInForeground) {
                 AppNotificationManager.show(getApplicationContext(), channelForType(type), title, body);
-                Log.d(TAG, "System notification shown (killed-app path): type=" + type);
+                Log.d(TAG, "System notification shown (background/killed path): type=" + type);
             }
         } else {
             // Any other source: save to Firestore and notify.

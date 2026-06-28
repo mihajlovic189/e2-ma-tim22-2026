@@ -530,10 +530,8 @@ public class MainActivity extends AppCompatActivity {
                         String body  = doc.getString("body");
                         if (title == null || body == null) continue;
 
-                        if (!SlagalicaApp.isAppInForeground) {
-                            String channel = channelForType(type);
-                            AppNotificationManager.show(getApplicationContext(), channel, title, body);
-                        }
+                        AppNotificationManager.show(getApplicationContext(),
+                                channelForType(type), title, body);
                     }
                 });
     }
@@ -553,11 +551,9 @@ public class MainActivity extends AppCompatActivity {
 
         String title = "Nova poruka od: " + senderName;
 
-        // Show system notification if app is not visible
-        if (!SlagalicaApp.isAppInForeground) {
-            AppNotificationManager.show(getApplicationContext(),
-                    SlagalicaApp.CHANNEL_CHAT, title, text);
-        }
+        // Show system notification
+        AppNotificationManager.show(getApplicationContext(),
+                SlagalicaApp.CHANNEL_CHAT, title, text);
 
         // Save to Firestore using msgId as document ID so the cloud function write
         // (if deployed) lands on the same document rather than creating a duplicate.
