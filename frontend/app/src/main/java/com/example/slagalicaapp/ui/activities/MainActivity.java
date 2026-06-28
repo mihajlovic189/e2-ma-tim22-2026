@@ -30,7 +30,9 @@ import com.example.slagalicaapp.ui.fragments.HomeFragment;
 import com.example.slagalicaapp.ui.fragments.LoginFragment;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
@@ -49,6 +51,10 @@ public class MainActivity extends AppCompatActivity {
     private com.google.firebase.database.ChildEventListener backgroundChatListener;
     private com.google.firebase.database.DatabaseReference backgroundChatRef;
     private long chatListenerStartTime = 0L;
+
+    // Firestore listener for non-chat notifications (friend requests, rewards, etc.)
+    private ListenerRegistration notifListener;
+    private long notifListenerStartTime = 0L;
 
     private static final Map<String, String> GAME_LABELS = new LinkedHashMap<>();
     static {
@@ -209,6 +215,8 @@ public class MainActivity extends AppCompatActivity {
                             startBackgroundChatNotificationListener(uid, region);
                         });
 
+                startNotifListener(uid);
+
                 proveriIDodeliDnevneTokene();
                 new LeaderboardRepository().checkAndDistributeRewards(MainActivity.this, null);
             }
@@ -234,6 +242,11 @@ public class MainActivity extends AppCompatActivity {
             backgroundChatListener = null;
         }
         SlagalicaApp.isChatListenerRunning = false;
+        if (notifListener != null) {
+            notifListener.remove();
+            notifListener = null;
+        }
+        SlagalicaApp.isNotifListenerRunning = false;
     }
 
     // ── Global invite listener ────────────────────────────────────────────────
@@ -489,6 +502,50 @@ public class MainActivity extends AppCompatActivity {
 
         SlagalicaApp.isChatListenerRunning = true;
         backgroundChatRef.limitToLast(50).addChildEventListener(backgroundChatListener);
+    }
+
+    /** Watches for new non-chat notification docs and shows system notifications.
+     *  Works without cloud functions (pure client-side). */
+    private void startNotifListener(String uid) {
+        if (notifListener != null) return;
+        notifListenerStartTime = System.currentTimeMillis();
+        SlagalicaApp.isNotifListenerRunning = true;
+
+        notifListener = FirebaseFirestore.getInstance()
+                .collection("users").document(uid)
+                .collection("notifications")
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null || snapshots == null) return;
+                    for (DocumentChange change : snapshots.getDocumentChanges()) {
+                        if (change.getType() != DocumentChange.Type.ADDED) continue;
+                        com.google.firebase.firestore.DocumentSnapshot doc = change.getDocument();
+
+                        Long ts = doc.getLong("timestamp");
+                        if (ts == null || ts < notifListenerStartTime) continue;
+
+                        String type  = doc.getString("type");
+                        if ("chat".equals(type)) continue; // handled by RTDB listener
+
+                        String title = doc.getString("title");
+                        String body  = doc.getString("body");
+                        if (title == null || body == null) continue;
+
+                        if (!SlagalicaApp.isAppInForeground) {
+                            String channel = channelForType(type);
+                            AppNotificationManager.show(getApplicationContext(), channel, title, body);
+                        }
+                    }
+                });
+    }
+
+    private String channelForType(String type) {
+        if (type == null) return SlagalicaApp.CHANNEL_OTHER;
+        switch (type) {
+            case "chat":    return SlagalicaApp.CHANNEL_CHAT;
+            case "ranking": return SlagalicaApp.CHANNEL_RANKING;
+            case "rewards": return SlagalicaApp.CHANNEL_REWARDS;
+            default:        return SlagalicaApp.CHANNEL_OTHER;
+        }
     }
 
     private void prikažiLokalnuChatNotifikaciju(String senderName, String text, String msgId) {

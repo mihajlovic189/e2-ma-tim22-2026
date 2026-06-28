@@ -14,7 +14,9 @@ public class SlagalicaApp extends Application {
     public static boolean isUserInChatScreen    = false;
     public static boolean isAppInForeground    = false;
     /** True while MainActivity's RTDB chat listener is active (app process alive, not killed). */
-    public static boolean isChatListenerRunning = false;
+    public static boolean isChatListenerRunning   = false;
+    /** True while MainActivity's Firestore notification listener is active. */
+    public static boolean isNotifListenerRunning  = false;
 
     @Override
     public void onCreate() {

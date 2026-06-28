@@ -39,11 +39,13 @@ public class SlagalicaFCMService extends FirebaseMessagingService {
 
         if ("direct_fcm".equals(source)) {
             // Cloud function already wrote this to Firestore — do NOT save again.
-            // For chat the RTDB listener (prikažiLokalnuChatNotifikaciju) shows the
-            // system notification while the app process is alive; only show it here
-            // when the app was killed (isChatListenerRunning == false).
-            boolean rtdbHandlingChat = "chat".equals(type) && SlagalicaApp.isChatListenerRunning;
-            if (!SlagalicaApp.isAppInForeground && !rtdbHandlingChat) {
+            // The client-side listeners (RTDB for chat, Firestore for everything else)
+            // show the system notification while the app process is alive.
+            // Only show it here when the app was killed (listeners not running).
+            boolean clientHandling = "chat".equals(type)
+                    ? SlagalicaApp.isChatListenerRunning
+                    : SlagalicaApp.isNotifListenerRunning;
+            if (!SlagalicaApp.isAppInForeground && !clientHandling) {
                 AppNotificationManager.show(getApplicationContext(), channelForType(type), title, body);
                 Log.d(TAG, "System notification shown (killed-app path): type=" + type);
             }
