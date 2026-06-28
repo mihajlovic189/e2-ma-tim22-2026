@@ -534,6 +534,9 @@ public class MainActivity extends AppCompatActivity {
                         Long ts = doc.getLong("timestamp");
                         if (ts == null || ts < notifListenerStartTime) continue;
 
+                        Boolean fromRtdb = doc.getBoolean("fromRtdb");
+                        if (fromRtdb != null && fromRtdb) continue; // handled by RTDB listener
+
                         String type  = doc.getString("type");
                         if ("chat".equals(type)) continue; // handled by prikažiLokalnuChatNotifikaciju
 

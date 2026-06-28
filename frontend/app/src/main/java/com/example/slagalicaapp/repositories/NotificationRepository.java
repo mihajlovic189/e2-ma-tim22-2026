@@ -43,6 +43,9 @@ public class NotificationRepository {
         data.put("timestamp", System.currentTimeMillis());
         data.put("read", false);
 
+        // Mark so Firestore listener can skip this (RTDB listener handles it)
+        data.put("fromRtdb", true);
+
         // Firestore — for in-app notification history
         FirebaseFirestore.getInstance()
                 .collection("users").document(targetUid)
