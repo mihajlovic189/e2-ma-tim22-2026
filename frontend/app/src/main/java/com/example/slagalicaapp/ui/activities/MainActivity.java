@@ -56,6 +56,11 @@ public class MainActivity extends AppCompatActivity {
     private ListenerRegistration notifListener;
     private long notifListenerStartTime = 0L;
 
+    // RTDB listener for cross-user notifications (friend requests via saveForUser)
+    private com.google.firebase.database.ChildEventListener rtdbNotifListener;
+    private com.google.firebase.database.DatabaseReference rtdbNotifRef;
+    private long rtdbNotifStartTime = 0L;
+
     private static final Map<String, String> GAME_LABELS = new LinkedHashMap<>();
     static {
         GAME_LABELS.put("KORAK_PO_KORAK",  "Korak po korak");
@@ -245,6 +250,10 @@ public class MainActivity extends AppCompatActivity {
         if (notifListener != null) {
             notifListener.remove();
             notifListener = null;
+        }
+        if (rtdbNotifListener != null && rtdbNotifRef != null) {
+            rtdbNotifRef.removeEventListener(rtdbNotifListener);
+            rtdbNotifListener = null;
         }
         SlagalicaApp.isNotifListenerRunning = false;
     }
@@ -504,13 +513,15 @@ public class MainActivity extends AppCompatActivity {
         backgroundChatRef.limitToLast(50).addChildEventListener(backgroundChatListener);
     }
 
-    /** Watches for new non-chat notification docs and shows system notifications.
-     *  Works without cloud functions (pure client-side). */
+    /** Watches for new notification docs and shows system notifications.
+     *  Works without cloud functions (pure client-side).
+     *  Listens on both Firestore (self-generated) and RTDB (cross-user via saveForUser). */
     private void startNotifListener(String uid) {
         if (notifListener != null) return;
         notifListenerStartTime = System.currentTimeMillis();
         SlagalicaApp.isNotifListenerRunning = true;
 
+        // Firestore listener — catches rewards, self-generated notifications
         notifListener = FirebaseFirestore.getInstance()
                 .collection("users").document(uid)
                 .collection("notifications")
@@ -524,7 +535,7 @@ public class MainActivity extends AppCompatActivity {
                         if (ts == null || ts < notifListenerStartTime) continue;
 
                         String type  = doc.getString("type");
-                        if ("chat".equals(type)) continue; // handled by RTDB listener
+                        if ("chat".equals(type)) continue; // handled by prikažiLokalnuChatNotifikaciju
 
                         String title = doc.getString("title");
                         String body  = doc.getString("body");
@@ -534,6 +545,34 @@ public class MainActivity extends AppCompatActivity {
                                 channelForType(type), title, body);
                     }
                 });
+
+        // RTDB listener — catches cross-user notifications (friend requests)
+        rtdbNotifStartTime = System.currentTimeMillis();
+        rtdbNotifRef = FirebaseDatabase.getInstance().getReference()
+                .child("notifications").child(uid);
+        rtdbNotifListener = new com.google.firebase.database.ChildEventListener() {
+            @Override
+            public void onChildAdded(@NonNull com.google.firebase.database.DataSnapshot snapshot,
+                                     @Nullable String previousChildName) {
+                Long ts = snapshot.child("timestamp").getValue(Long.class);
+                if (ts == null || ts < rtdbNotifStartTime) return;
+
+                String type = snapshot.child("type").getValue(String.class);
+                String title = snapshot.child("title").getValue(String.class);
+                String body = snapshot.child("body").getValue(String.class);
+                if (title == null || body == null) return;
+
+                AppNotificationManager.show(getApplicationContext(),
+                        channelForType(type), title, body);
+            }
+            @Override public void onChildChanged(@NonNull com.google.firebase.database.DataSnapshot snapshot,
+                                                  @Nullable String previousChildName) {}
+            @Override public void onChildRemoved(@NonNull com.google.firebase.database.DataSnapshot snapshot) {}
+            @Override public void onChildMoved(@NonNull com.google.firebase.database.DataSnapshot snapshot,
+                                                @Nullable String previousChildName) {}
+            @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
+        };
+        rtdbNotifRef.addChildEventListener(rtdbNotifListener);
     }
 
     private String channelForType(String type) {

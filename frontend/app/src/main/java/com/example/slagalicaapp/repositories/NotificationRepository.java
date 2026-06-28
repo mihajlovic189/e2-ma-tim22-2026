@@ -6,6 +6,7 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.slagalicaapp.model.NotificationModel;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
@@ -41,10 +42,17 @@ public class NotificationRepository {
         data.put("type", type != null ? type : "other");
         data.put("timestamp", System.currentTimeMillis());
         data.put("read", false);
+
+        // Firestore — for in-app notification history
         FirebaseFirestore.getInstance()
                 .collection("users").document(targetUid)
                 .collection("notifications")
                 .add(data);
+
+        // RTDB — for reliable system notification delivery via ChildEventListener
+        FirebaseDatabase.getInstance().getReference()
+                .child("notifications").child(targetUid)
+                .push().setValue(data);
     }
 
     /**
