@@ -170,9 +170,6 @@ public class GameActivity extends AppCompatActivity {
             // Standardna 1v1 multiplayer logika (sinhronizovana preko baze)
             if (GAME_MOJ_BROJ.equals(currentSubGame)) {
                 if (roomListener != null) roomRef.removeEventListener(roomListener);
-                if (result.getBoolean("iWon", false)) {
-                    new DailyMissionsRepository().completeMission("winMatch", null);
-                }
                 persistFinalResultAndFinish(false);
                 return;
             }
@@ -218,11 +215,6 @@ public class GameActivity extends AppCompatActivity {
 
                 FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
                 String uid = user != null ? user.getUid() : null;
-
-                Boolean isFriendly = snapshot.child("isFriendly").getValue(Boolean.class);
-                if (Boolean.TRUE.equals(isFriendly) && uid != null) {
-                    new DailyMissionsRepository().completeMission("friendlyMatch", null);
-                }
 
                 if (uid != null) {
                     if (uid.equals(p1Uid)) {
@@ -472,12 +464,6 @@ public class GameActivity extends AppCompatActivity {
                     updates.put("monthlyGamesPlayed", baseMonthlyGames + 1);
                     Long curGames = doc.getLong("totalGamesPlayed");
                     updates.put("totalGamesPlayed", (curGames != null ? curGames : 0) + 1);
-
-                    if (samJaPobednik) {
-                        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new java.util.Date());
-                        updates.put("dailyMissions.date", today);
-                        updates.put("dailyMissions.winMatch", true);
-                    }
 
                     final int finalRazlika = razlikaZvezda;
                     final int finalNagrada = nagradniTokeni;

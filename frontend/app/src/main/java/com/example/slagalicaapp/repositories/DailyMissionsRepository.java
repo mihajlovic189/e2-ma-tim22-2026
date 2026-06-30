@@ -103,6 +103,11 @@ public class DailyMissionsRepository {
                         Map<String, Object> update = new HashMap<>();
                         update.put("dailyMissions.date", today);
                         update.put("dailyMissions.winMatch", true);
+                        // Reset other fields so yesterday's progress doesn't carry over.
+                        update.put("dailyMissions.sendChat", false);
+                        update.put("dailyMissions.friendlyMatch", false);
+                        update.put("dailyMissions.winTournament", false);
+                        update.put("dailyMissions.rewardsClaimed", false);
                         db.collection("users").document(uid).update(update);
                     }
                     if (missionsLiveData != null) missionsLiveData.setValue(data);
@@ -161,6 +166,9 @@ public class DailyMissionsRepository {
                             data.rewardsClaimed = bool(missions.get("rewardsClaimed"));
                         }
                     }
+                    // Track whether this is the first mission written for today so we
+                    // can explicitly reset stale fields left over from previous days.
+                    boolean isNewDay = (missions == null || !today.equals(missions.get("date")));
 
                     boolean wasAllBefore = data.allCompleted();
                     boolean wasAlreadyCompleted;
@@ -185,6 +193,15 @@ public class DailyMissionsRepository {
 
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("dailyMissions.date", data.date);
+                    if (isNewDay) {
+                        // Explicitly reset all fields so yesterday's progress doesn't
+                        // bleed into today when only one mission is written.
+                        updates.put("dailyMissions.winMatch", false);
+                        updates.put("dailyMissions.sendChat", false);
+                        updates.put("dailyMissions.friendlyMatch", false);
+                        updates.put("dailyMissions.winTournament", false);
+                        updates.put("dailyMissions.rewardsClaimed", false);
+                    }
                     updates.put("dailyMissions." + missionKey, true);
                     if (data.rewardsClaimed) {
                         updates.put("dailyMissions.rewardsClaimed", true);
@@ -200,9 +217,19 @@ public class DailyMissionsRepository {
                     }
 
                     final boolean newlyCompleted = !wasAlreadyCompleted;
+                    final int finalStarsAwarded = starsAwarded;
+                    final int finalTokensAwarded = tokensAwarded;
                     db.collection("users").document(user.getUid())
                             .update(updates)
                             .addOnSuccessListener(unused -> {
+                                if (newlyCompleted) {
+                                    String name = missionLabel(missionKey);
+                                    String body = (finalStarsAwarded == 6)
+                                            ? "'" + name + "' završena i sve dnevne misije su ispunjene! Dobili ste " + finalStarsAwarded + " zvezdi i " + finalTokensAwarded + " tokena."
+                                            : "'" + name + "' završena. Dobili ste " + finalStarsAwarded + " zvezdi.";
+                                    NotificationRepository.saveForUser(user.getUid(),
+                                            "Dnevna misija završena!", body, "rewards");
+                                }
                                 if (callback != null) callback.onSuccess(newlyCompleted);
                             })
                             .addOnFailureListener(e -> {
@@ -216,6 +243,16 @@ public class DailyMissionsRepository {
 
     private String getToday() {
         return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+    }
+
+    private String missionLabel(String key) {
+        switch (key) {
+            case "winMatch":      return "Pobedi u mecu";
+            case "sendChat":      return "Posalji poruku";
+            case "friendlyMatch": return "Odigraj prijateljski mec";
+            case "winTournament": return "Pobedi na turniru";
+            default:              return key;
+        }
     }
 
     private boolean bool(Object val) {
