@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="16dp">
+
+        <!-- ─── WAITING ────────────────────────────────────────────────── -->
+        <LinearLayout
+            android:id="@+id/layoutWaiting"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:visibility="visible">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TURNIR"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:textColor="@color/text"
+                android:layout_marginBottom="24dp" />
+
+            <ProgressBar
+                android:id="@+id/progressWaiting"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:id="@+id/tvWaitingCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Uplata ulaznice..."
+                android:textSize="18sp"
+                android:textColor="@color/text"
+                android:gravity="center"
+                android:layout_marginBottom="32dp" />
+
+            <Button
+                android:id="@+id/btnCancelJoin"
+                android:layout_width="200dp"
+                android:layout_height="wrap_content"
+                android:text="Odustani"
+                android:textColor="@color/text"
+                android:backgroundTint="#B71C1C"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+        <!-- ─── BRACKET ───────────────────────────────────────────────── -->
+        <LinearLayout
+            android:id="@+id/layoutBracket"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TURNIR"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="@color/text"
+                android:layout_marginBottom="20dp"
+                android:layout_marginTop="8dp" />
+
+            <!-- Semi 1 label -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="POLUFINALE 1"
+                android:textSize="14sp"
+                android:textColor="#AAAAAA"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Semi 1 row -->
+            <LinearLayout
+                android:id="@+id/rowSemi1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="#1A1A2E"
+                android:padding="12dp"
+                android:layout_marginBottom="12dp">
+
+                <LinearLayout
+                    android:id="@+id/slotP1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="8dp">
+
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="#2C3E50"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvNameP1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="?"
+                        android:textColor="@color/text"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="VS"
+                    android:textColor="#FFCC00"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:layout_marginHorizontal="12dp" />
+
+                <LinearLayout
+                    android:id="@+id/slotP2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="8dp">
+
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="#2C3E50"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvNameP2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="?"
+                        android:textColor="@color/text"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Semi 2 label -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="POLUFINALE 2"
+                android:textSize="14sp"
+                android:textColor="#AAAAAA"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Semi 2 row -->
+            <LinearLayout
+                android:id="@+id/rowSemi2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="#1A1A2E"
+                android:padding="12dp"
+                android:layout_marginBottom="20dp">
+
+                <LinearLayout
+                    android:id="@+id/slotP3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="8dp">
+
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="#2C3E50"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvNameP3"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="?"
+                        android:textColor="@color/text"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="VS"
+                    android:textColor="#FFCC00"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:layout_marginHorizontal="12dp" />
+
+                <LinearLayout
+                    android:id="@+id/slotP4"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="8dp">
+
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="#2C3E50"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvNameP4"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="?"
+                        android:textColor="@color/text"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#444444"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Final label -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FINALE"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#FFD700"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Final row (hidden until both semis done) -->
+            <LinearLayout
+                android:id="@+id/layoutFinalRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="#1E2A4A"
+                android:padding="12dp"
+                android:layout_marginBottom="24dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/slotF1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="8dp">
+
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="#FFD700"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvNameF1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="?"
+                        android:textColor="#FFD700"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="VS"
+                    android:textColor="#FFD700"
+                    android:textStyle="bold"
+                    android:textSize="18sp"
+                    android:layout_marginHorizontal="12dp" />
+
+                <LinearLayout
+                    android:id="@+id/slotF2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="8dp">
+
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="#FFD700"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvNameF2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="?"
+                        android:textColor="#FFD700"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvBracketStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Čekamo sve igrače..."
+                android:textColor="#AAAAAA"
+                android:textSize="15sp"
+                android:gravity="center"
+                android:layout_marginBottom="16dp" />
+
+        </LinearLayout>
+
+        <!-- ─── RESULT ────────────────────────────────────────────────── -->
+        <LinearLayout
+            android:id="@+id/layoutResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvResultTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Turnir završen"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:textColor="@color/text"
+                android:gravity="center"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:id="@+id/tvResultBody"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="16sp"
+                android:textColor="#AAAAAA"
+                android:gravity="center"
+                android:layout_marginBottom="32dp" />
+
+            <Button
+                android:id="@+id/btnResultOk"
+                android:layout_width="200dp"
+                android:layout_height="wrap_content"
+                android:text="U redu"
+                android:textColor="@color/text"
+                android:backgroundTint="@color/primary" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

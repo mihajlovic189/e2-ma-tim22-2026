@@ -92,6 +92,12 @@ public class HomeFragment extends Fragment {
                         .addToBackStack(null)
                         .commit());
 
+        binding.btnTournament.setOnClickListener(v ->
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new TournamentFragment())
+                        .addToBackStack(null)
+                        .commit());
+
         binding.btnRegionalChallenges.setOnClickListener(v ->
                 getParentFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new ChallengesFragment())

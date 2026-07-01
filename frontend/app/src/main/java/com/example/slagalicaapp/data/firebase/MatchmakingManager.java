@@ -475,6 +475,33 @@ public class MatchmakingManager {
                 + random.nextInt(6) + "," + random.nextInt(6);
     }
 
+    /**
+     * Creates a room pre-populated with both players for tournament use.
+     * Seeds all game data as player 1, then applies the player-2 join update so the
+     * room starts in "playing" state. Used by TournamentRepository to set up semi/final rooms.
+     */
+    public void createTournamentRoom(String roomId, String p2Uid, String p2Name,
+                                      @Nullable Runnable onComplete) {
+        createRoom(roomId, 1, false, () -> {
+            DatabaseReference roomRef = db.child("rooms").child(gameType).child(roomId);
+            long now = System.currentTimeMillis();
+
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("player2", p2Name);
+            updates.put("player2Uid", p2Uid);
+            updates.put("status", "playing");
+            updates.put("isTournament", true);
+            updates.put("koZnaZna/currentQuestionIndex", 0);
+            updates.put("koZnaZna/questionStatus", "playing");
+            updates.put("koZnaZna/questionStartedAt", now + 2000L);
+            updates.put("mojBroj/roundEndsAt", 0L);
+
+            roomRef.updateChildren(updates, (error, ref) -> {
+                if (onComplete != null) onComplete.run();
+            });
+        });
+    }
+
     public String createDirectRoom(@Nullable Runnable onRoomReady) {
         String roomId = db.child("rooms").child(gameType).push().getKey();
         if (roomId != null) {

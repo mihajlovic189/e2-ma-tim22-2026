@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.slagalicaapp.model.GameResult;
 import com.example.slagalicaapp.repositories.DailyMissionsRepository;
 import com.example.slagalicaapp.repositories.GameResultRepository;
+import com.example.slagalicaapp.repositories.TournamentRepository;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.firebase.ChallengeManager; // DODATO
 import com.example.slagalicaapp.ui.fragments.KorakPoKorakFragment;
@@ -38,10 +39,12 @@ public class GameActivity extends AppCompatActivity {
 
     private static final String TAG = "GameActivity";
 
-    public static final String EXTRA_ROOM_ID   = "ROOM_ID";
+    public static final String EXTRA_ROOM_ID      = "ROOM_ID";
     public static final String EXTRA_CHALLENGE_ID = "CHALLENGE_ID"; // DODATO
-    public static final String EXTRA_PLAYER_NUM = "PLAYER_NUM";
-    public static final String EXTRA_PLAYER_NAME = "PLAYER_NAME";
+    public static final String EXTRA_PLAYER_NUM   = "PLAYER_NUM";
+    public static final String EXTRA_PLAYER_NAME  = "PLAYER_NAME";
+    public static final String EXTRA_TOURNAMENT_ID    = "TOURNAMENT_ID";
+    public static final String EXTRA_TOURNAMENT_ROUND = "TOURNAMENT_ROUND"; // "semi1"/"semi2"/"final"
 
     public static final String GAME_MECH     = "SLAGALICA_MECH";
 
@@ -345,6 +348,13 @@ public class GameActivity extends AppCompatActivity {
 
                 gameResultRepository.saveGameResult(result, firestoreCollection)
                         .addOnSuccessListener(documentReference -> {
+                            String tournamentId    = getIntent().getStringExtra(EXTRA_TOURNAMENT_ID);
+                            String tournamentRound = getIntent().getStringExtra(EXTRA_TOURNAMENT_ROUND);
+                            if (tournamentId != null && tournamentRound != null) {
+                                handleTournamentMatchEnd(result, tournamentId, tournamentRound);
+                                return;
+                            }
+
                             DailyMissionsRepository missionsRepo = new DailyMissionsRepository();
                             if (!isFriendly) {
                                 if (currentUser.getUid().equals(result.winnerUid)) {
@@ -367,6 +377,13 @@ public class GameActivity extends AppCompatActivity {
                         })
                         .addOnFailureListener(e -> {
                             Log.e(TAG, "Greška pri čuvanju u Firestore: " + e.getMessage(), e);
+                            String tournamentId    = getIntent().getStringExtra(EXTRA_TOURNAMENT_ID);
+                            String tournamentRound = getIntent().getStringExtra(EXTRA_TOURNAMENT_ROUND);
+                            if (tournamentId != null && tournamentRound != null) {
+                                handleTournamentMatchEnd(result, tournamentId, tournamentRound);
+                                return;
+                            }
+
                             // Economy/leaderboard update runs even if match-result save fails
                             if (!isFriendly) {
                                 if (currentUser.getUid().equals(result.winnerUid)) {
@@ -392,6 +409,28 @@ public class GameActivity extends AppCompatActivity {
                 finish();
             }
         });
+    }
+
+    private void handleTournamentMatchEnd(GameResult result, String tournamentId,
+                                           String tournamentRound) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) { ocistiSobuIAzurnoZavrsi(); return; }
+
+        String myUid = user.getUid();
+        boolean iWon  = myUid.equals(result.winnerUid);
+        int myScore   = myUid.equals(result.player1Uid) ? result.player1Score : result.player2Score;
+
+        if (iWon && "final".equals(tournamentRound)) {
+            new DailyMissionsRepository().completeMission("winTournament", null);
+        }
+
+        new TournamentRepository().reportMatchResult(
+                tournamentId, tournamentRound, result.winnerUid,
+                myUid, myScore, iWon,
+                new TournamentRepository.ResultCallback() {
+                    @Override public void onDone()         { ocistiSobuIAzurnoZavrsi(); }
+                    @Override public void onError(String m){ ocistiSobuIAzurnoZavrsi(); }
+                });
     }
 
     private void primeniEkonomijuZvezdaITokena(GameResult result, String currentUid) {
