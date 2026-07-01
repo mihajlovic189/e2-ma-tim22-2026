@@ -181,33 +181,33 @@ public class KorakPoKorakManager {
         }
     }
 
-    // Guarded by a transaction on rounds/1/solution so a re-entrant call (e.g. the
+    // Guarded by a transaction on the whole rounds node so a re-entrant call (e.g. the
     // fragment getting recreated on player1's device) can never clobber puzzle data
-    // that a client may have already latched onto — that caused the two devices to
-    // show different step text for what was supposedly the same round.
+    // that a client may have already latched onto. Solution AND steps for both rounds
+    // are written inside the SAME transaction so no listener can ever observe a state
+    // where the solution exists but the steps haven't arrived yet (that gap is what
+    // made the step fields show up blank while the solution was already known).
     public void writeRoundsData(String r1Solution, java.util.List<String> r1Steps,
                                  String r2Solution, java.util.List<String> r2Steps) {
-        roomRef.child("korakPoKorak/rounds/1/solution").runTransaction(new Transaction.Handler() {
+        roomRef.child("korakPoKorak/rounds").runTransaction(new Transaction.Handler() {
             @Override
             public Transaction.Result doTransaction(MutableData data) {
-                if (data.getValue() != null) return Transaction.abort();
-                data.setValue(r1Solution);
+                if (data.child("1").child("solution").getValue() != null) {
+                    return Transaction.abort();
+                }
+                data.child("1").child("solution").setValue(r1Solution);
+                for (int i = 0; i < r1Steps.size(); i++) {
+                    data.child("1").child("steps").child(String.valueOf(i)).setValue(r1Steps.get(i));
+                }
+                data.child("2").child("solution").setValue(r2Solution);
+                for (int i = 0; i < r2Steps.size(); i++) {
+                    data.child("2").child("steps").child(String.valueOf(i)).setValue(r2Steps.get(i));
+                }
                 return Transaction.success(data);
             }
 
             @Override
-            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {
-                if (!committed) return;
-                Map<String, Object> update = new HashMap<>();
-                for (int i = 0; i < r1Steps.size(); i++) {
-                    update.put("korakPoKorak/rounds/1/steps/" + i, r1Steps.get(i));
-                }
-                update.put("korakPoKorak/rounds/2/solution", r2Solution);
-                for (int i = 0; i < r2Steps.size(); i++) {
-                    update.put("korakPoKorak/rounds/2/steps/" + i, r2Steps.get(i));
-                }
-                roomRef.updateChildren(update);
-            }
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {}
         });
     }
 

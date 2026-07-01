@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.slagalicaapp.model.GameResult;
 import com.example.slagalicaapp.repositories.DailyMissionsRepository;
@@ -105,8 +106,25 @@ public class GameActivity extends AppCompatActivity {
         } else {
             // Standardni 1v1 multiplayer preko soba
             roomRef = FirebaseDatabase.getInstance().getReference().child("rooms").child(GAME_MECH).child(roomId);
-            resolvePlayerNumberFromRoom(this::pratiStanjePartije);
+            resolvePlayerNumberFromRoom(() -> {
+                registerDisconnectForfeit();
+                pratiStanjePartije();
+            });
         }
+    }
+
+    // Most game screens don't even have a "give up" button, so the only realistic way
+    // most quits happen is the app getting closed/killed or the connection dropping.
+    // Without this, the opponent (and the whole tournament bracket behind them) would
+    // just wait forever. Mirrors the same fields forfeitMatch() writes explicitly.
+    private void registerDisconnectForfeit() {
+        if (roomRef == null) return;
+        Map<String, Object> disconnectUpdate = new HashMap<>();
+        disconnectUpdate.put("player" + playerNumber + "Left", true);
+        disconnectUpdate.put("status", "forfeit");
+        disconnectUpdate.put("forfeitBy", "player" + playerNumber);
+        disconnectUpdate.put("winner", playerNumber == 1 ? "player2" : "player1");
+        roomRef.onDisconnect().updateChildren(disconnectUpdate);
     }
 
     private void pratiStanjePartije() {
@@ -272,6 +290,25 @@ public class GameActivity extends AppCompatActivity {
                 .commitAllowingStateLoss();
     }
 
+    @Override
+    public void onBackPressed() {
+        // Most minigame screens have no "give up" button, so back-navigation was the
+        // only way most players actually left mid-match — and it used to just finish()
+        // silently, leaving the opponent (and the tournament bracket) waiting forever
+        // because no forfeit was ever recorded. Route it through the same forfeit path
+        // the explicit give-up button uses, with the same confirmation.
+        if (roomId == null || hasForfeited || finalResultSaved) {
+            super.onBackPressed();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Odustajanje")
+                .setMessage("Ako izađeš, smatra se da si izgubio partiju. Da li želiš da odustaneš?")
+                .setPositiveButton("Odustani", (dialog, which) -> forfeitMatch())
+                .setNegativeButton("Nastavi", null)
+                .show();
+    }
+
     public void forfeitMatch() {
         if (challengeId != null) {
             završiIzazovIUpisiRezultat();
@@ -282,6 +319,7 @@ public class GameActivity extends AppCompatActivity {
         hasForfeited = true;
 
         if (roomListener != null) roomRef.removeEventListener(roomListener);
+        roomRef.onDisconnect().cancel();
 
         String myLeftKey = "player" + playerNumber + "Left";
         String opponentKey = playerNumber == 1 ? "player2" : "player1";
@@ -330,6 +368,7 @@ public class GameActivity extends AppCompatActivity {
         }
 
         finalResultSaved = true;
+        if (roomRef != null) roomRef.onDisconnect().cancel();
         long finishedAt = System.currentTimeMillis();
         String firestoreCollection = "slagalica_match_results";
 
