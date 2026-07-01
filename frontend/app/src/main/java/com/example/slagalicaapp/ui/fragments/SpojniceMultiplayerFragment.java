@@ -238,8 +238,10 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
                 leftBtn.setEnabled(false);
             } else if (leftFailed) {
                 // Narandžasta: igrač1 pogrešio — igrač2 može da pokuša, igrač1 ne može ponovo
+                int startingPlayerForRound = (currentRound % 2) + 1;
+                boolean stealPhase = (activePlayer != startingPlayerForRound);
                 applyTint(leftBtn, "#F97316");
-                leftBtn.setEnabled(iAmActive);
+                leftBtn.setEnabled(iAmActive && stealPhase);
             } else {
                 leftBtn.setBackgroundTintList(null);
                 leftBtn.setEnabled(iAmActive);

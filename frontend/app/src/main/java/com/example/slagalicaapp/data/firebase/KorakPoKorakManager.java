@@ -181,18 +181,34 @@ public class KorakPoKorakManager {
         }
     }
 
+    // Guarded by a transaction on rounds/1/solution so a re-entrant call (e.g. the
+    // fragment getting recreated on player1's device) can never clobber puzzle data
+    // that a client may have already latched onto — that caused the two devices to
+    // show different step text for what was supposedly the same round.
     public void writeRoundsData(String r1Solution, java.util.List<String> r1Steps,
                                  String r2Solution, java.util.List<String> r2Steps) {
-        Map<String, Object> update = new HashMap<>();
-        update.put("korakPoKorak/rounds/1/solution", r1Solution);
-        for (int i = 0; i < r1Steps.size(); i++) {
-            update.put("korakPoKorak/rounds/1/steps/" + i, r1Steps.get(i));
-        }
-        update.put("korakPoKorak/rounds/2/solution", r2Solution);
-        for (int i = 0; i < r2Steps.size(); i++) {
-            update.put("korakPoKorak/rounds/2/steps/" + i, r2Steps.get(i));
-        }
-        roomRef.updateChildren(update);
+        roomRef.child("korakPoKorak/rounds/1/solution").runTransaction(new Transaction.Handler() {
+            @Override
+            public Transaction.Result doTransaction(MutableData data) {
+                if (data.getValue() != null) return Transaction.abort();
+                data.setValue(r1Solution);
+                return Transaction.success(data);
+            }
+
+            @Override
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {
+                if (!committed) return;
+                Map<String, Object> update = new HashMap<>();
+                for (int i = 0; i < r1Steps.size(); i++) {
+                    update.put("korakPoKorak/rounds/1/steps/" + i, r1Steps.get(i));
+                }
+                update.put("korakPoKorak/rounds/2/solution", r2Solution);
+                for (int i = 0; i < r2Steps.size(); i++) {
+                    update.put("korakPoKorak/rounds/2/steps/" + i, r2Steps.get(i));
+                }
+                roomRef.updateChildren(update);
+            }
+        });
     }
 
     public void startNextRoundIfReady(int nextActivePlayer, String solution, java.util.List<String> steps) {

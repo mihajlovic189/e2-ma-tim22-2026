@@ -33,11 +33,35 @@ public class KoZnaZnaManager {
     private String lastQuestionStatus = "";
     private int lastAnswerBitmask = 0;
 
+    // Two phones' System.currentTimeMillis() can drift by seconds; questionStartedAt
+    // is written on one device and the remaining-time countdown is computed on the
+    // other, so uncorrected clock skew made the timer occasionally jump straight to
+    // zero. This offset (from Firebase's authoritative server clock) cancels that out.
+    private volatile long serverTimeOffsetMs = 0;
+    private ValueEventListener serverTimeListener;
+
     public KoZnaZnaManager(String roomId, int myPlayerNumber, KoZnaZnaListener listener) {
         this.roomRef = FirebaseDatabase.getInstance().getReference()
                 .child("rooms").child(GameActivity.GAME_MECH).child(roomId);
         this.myPlayerNumber = myPlayerNumber;
         this.listener = listener;
+
+        serverTimeListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                Long offset = snapshot.getValue(Long.class);
+                serverTimeOffsetMs = offset != null ? offset : 0;
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        };
+        FirebaseDatabase.getInstance().getReference(".info/serverTimeOffset")
+                .addValueEventListener(serverTimeListener);
+    }
+
+    public long getServerTimeMs() {
+        return System.currentTimeMillis() + serverTimeOffsetMs;
     }
 
     public void startListening() {
@@ -64,7 +88,7 @@ public class KoZnaZnaManager {
                         Map<String, Object> startUpd = new HashMap<>();
                         startUpd.put("koZnaZna/currentQuestionIndex", 0);
                         startUpd.put("koZnaZna/questionStatus", "playing");
-                        startUpd.put("koZnaZna/questionStartedAt", System.currentTimeMillis());
+                        startUpd.put("koZnaZna/questionStartedAt", getServerTimeMs());
                         roomRef.updateChildren(startUpd);
                     }
                 }
@@ -188,6 +212,11 @@ public class KoZnaZnaManager {
         if (roomListener != null) {
             roomRef.removeEventListener(roomListener);
             roomListener = null;
+        }
+        if (serverTimeListener != null) {
+            FirebaseDatabase.getInstance().getReference(".info/serverTimeOffset")
+                    .removeEventListener(serverTimeListener);
+            serverTimeListener = null;
         }
     }
 
