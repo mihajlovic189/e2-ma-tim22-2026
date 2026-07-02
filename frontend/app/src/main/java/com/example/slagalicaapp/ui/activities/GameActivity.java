@@ -64,6 +64,9 @@ public class GameActivity extends AppCompatActivity {
     private boolean hasForfeited = false;
     private boolean finalResultSaved = false;
     private boolean isFriendlyMatch = false;
+    // Set once the opponent forfeits mid-match: the remaining player keeps playing
+    // solo through the rest of the sub-game sequence instead of the match ending.
+    private boolean soloMode = false;
 
     // Lokalni brojač poena za samostalno igranje u Izazovu
     private int ukupniPoeniIzazova = 0;
@@ -142,8 +145,13 @@ public class GameActivity extends AppCompatActivity {
 
                 String status = snapshot.child("status").getValue(String.class);
                 if ("forfeit".equals(status)) {
-                    roomRef.removeEventListener(this);
-                    persistFinalResultAndFinish(true);
+                    if (!soloMode) {
+                        soloMode = true;
+                        roomRef.removeEventListener(this);
+                        Toast.makeText(GameActivity.this,
+                                "Protivnik je napustio partiju. Nastavljate sami.", Toast.LENGTH_LONG).show();
+                        showGameFragment(currentSubGame);
+                    }
                     return;
                 }
 
@@ -164,29 +172,35 @@ public class GameActivity extends AppCompatActivity {
         roomRef.addValueEventListener(roomListener);
     }
 
+    /** Redosled šest podigara; vraća null kad je GAME_MOJ_BROJ (poslednja) upravo završena. */
+    private String nextSubGame(String current) {
+        if (GAME_KO_ZNA_ZNA.equals(current))   return GAME_SPOJNICE;
+        if (GAME_SPOJNICE.equals(current))     return GAME_ASOCIJACIJE;
+        if (GAME_ASOCIJACIJE.equals(current))  return GAME_SKOCKO;
+        if (GAME_SKOCKO.equals(current))       return GAME_KORAK;
+        if (GAME_KORAK.equals(current))        return GAME_MOJ_BROJ;
+        return null;
+    }
+
     private void handleSubGameFinished(android.os.Bundle result) {
         // GRANANJE LOGIKE: Ako je izazov, igrač samostalno menja igre lokalno
         if (challengeId != null) {
-            switch (currentSubGame) {
-                case GAME_KO_ZNA_ZNA:
-                    currentSubGame = GAME_SPOJNICE;
-                    break;
-                case GAME_SPOJNICE:
-                    currentSubGame = GAME_ASOCIJACIJE;
-                    break;
-                case GAME_ASOCIJACIJE:
-                    currentSubGame = GAME_SKOCKO;
-                    break;
-                case GAME_SKOCKO:
-                    currentSubGame = GAME_KORAK;
-                    break;
-                case GAME_KORAK:
-                    currentSubGame = GAME_MOJ_BROJ;
-                    break;
-                case GAME_MOJ_BROJ:
-                    završiIzazovIUpisiRezultat();
-                    return;
+            String next = nextSubGame(currentSubGame);
+            if (next == null) {
+                završiIzazovIUpisiRezultat();
+                return;
             }
+            currentSubGame = next;
+            showGameFragment(currentSubGame);
+        } else if (soloMode) {
+            // Protivnik je napustio partiju — nastavljamo kroz preostale podigre sami,
+            // isto kao u Izazovu, ali na kraju čuvamo pravi rezultat meča (ne Challenge).
+            String next = nextSubGame(currentSubGame);
+            if (next == null) {
+                finishSoloMatchAfterForfeit();
+                return;
+            }
+            currentSubGame = next;
             showGameFragment(currentSubGame);
         } else {
             // Standardna 1v1 multiplayer logika (sinhronizovana preko baze)
@@ -196,12 +210,7 @@ public class GameActivity extends AppCompatActivity {
                 return;
             }
             if (playerNumber == 1) {
-                String nextGame;
-                if (GAME_KO_ZNA_ZNA.equals(currentSubGame))   nextGame = GAME_SPOJNICE;
-                else if (GAME_SPOJNICE.equals(currentSubGame)) nextGame = GAME_ASOCIJACIJE;
-                else if (GAME_ASOCIJACIJE.equals(currentSubGame)) nextGame = GAME_SKOCKO;
-                else if (GAME_SKOCKO.equals(currentSubGame))   nextGame = GAME_KORAK;
-                else nextGame = GAME_MOJ_BROJ;
+                String nextGame = nextSubGame(currentSubGame);
 
                 // Snapshot the cumulative score at the moment this sub-game ends, so the
                 // per-sub-game contribution can be recovered later (scores/player1-2 is a
@@ -281,7 +290,7 @@ public class GameActivity extends AppCompatActivity {
 
     private void showGameFragment(String gameType) {
         Bundle args = new Bundle();
-        args.putString("roomId", roomId);
+        args.putString("roomId", soloMode ? null : roomId);
         args.putString("challengeId", challengeId);
         args.putInt("playerNumber", playerNumber);
         args.putInt("cumulativePoints", ukupniPoeniIzazova);
@@ -367,17 +376,37 @@ public class GameActivity extends AppCompatActivity {
             return;
         }
 
+        DatabaseReference myScoreRef = roomRef.child("scores").child("player" + playerNumber);
+
         FirebaseFirestore.getInstance().collection("users").document(currentUser.getUid())
                 .get()
                 .addOnSuccessListener(doc -> {
                     long trenutneZvezde = doc.getLong("totalStars") != null ? doc.getLong("totalStars") : 0;
-                    long noveZvezde = Math.max(0, trenutneZvezde - 10);
-                    FirebaseFirestore.getInstance().collection("users").document(currentUser.getUid())
-                            .update("totalStars", noveZvezde);
-                    Toast.makeText(GameActivity.this, "Napustili ste partiju. Izgubili ste 10 zvezda.", Toast.LENGTH_SHORT).show();
-                    finish();
+                    myScoreRef.get()
+                            .addOnSuccessListener(scoreSnap ->
+                                    applyLeaveDefeatPenalty(currentUser.getUid(), readInt(scoreSnap.getValue(), 0), trenutneZvezde))
+                            .addOnFailureListener(e ->
+                                    applyLeaveDefeatPenalty(currentUser.getUid(), 0, trenutneZvezde));
                 })
                 .addOnFailureListener(e -> finish());
+    }
+
+    /**
+     * Napuštanje partije se tretira kao normalan poraz — isti formula za gubitak
+     * zvezda kao i kada partija bude regularno izgubljena (StatsCalculator).
+     */
+    private void applyLeaveDefeatPenalty(String uid, int mojSkor, long trenutneZvezde) {
+        Map<String, Integer> epilog = StatsCalculator.obradiKrajPartije(false, mojSkor, (int) trenutneZvezde);
+        int finalneZvezde = epilog.get("finalStars");
+        int razlika = epilog.get("starDifference");
+
+        FirebaseFirestore.getInstance().collection("users").document(uid)
+                .update("totalStars", (long) finalneZvezde)
+                .addOnCompleteListener(t -> {
+                    String poruka = "Napustili ste partiju. " + (razlika >= 0 ? "+" : "") + razlika + " zvezda.";
+                    Toast.makeText(GameActivity.this, poruka, Toast.LENGTH_SHORT).show();
+                    finish();
+                });
     }
 
     private void persistFinalResultAndFinish(boolean forfeit) {
@@ -474,6 +503,25 @@ public class GameActivity extends AppCompatActivity {
                 finish();
             }
         });
+    }
+
+    /**
+     * Protivnik je napustio partiju, a ja sam odigrao preostale podigre sam (soloMode).
+     * scores/player{playerNumber} u sobi drži samo poene osvojene DO trenutka napuštanja —
+     * dodajemo poene osvojene posle toga (ukupniPoeniIzazova) pre nego što se meč sačuva
+     * kroz standardni persistFinalResultAndFinish tok (koji već ispravno tretira pobedu).
+     */
+    private void finishSoloMatchAfterForfeit() {
+        if (roomRef == null) { finish(); return; }
+
+        DatabaseReference myScoreRef = roomRef.child("scores").child("player" + playerNumber);
+        myScoreRef.get()
+                .addOnSuccessListener(scoreSnap -> {
+                    long baseScore = readLong(scoreSnap.getValue(), 0L);
+                    myScoreRef.setValue(baseScore + ukupniPoeniIzazova)
+                            .addOnCompleteListener(t -> persistFinalResultAndFinish(true));
+                })
+                .addOnFailureListener(e -> persistFinalResultAndFinish(true));
     }
 
     private void handleTournamentMatchEnd(GameResult result, String tournamentId,
