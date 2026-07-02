@@ -246,6 +246,7 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
 
             Bundle result = new Bundle();
             result.putBoolean("finished", true);
+            result.putBoolean("forfeit", forfeitBy != null);
             getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
         });
     }

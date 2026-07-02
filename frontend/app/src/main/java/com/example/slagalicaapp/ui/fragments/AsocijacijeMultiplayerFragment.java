@@ -206,6 +206,7 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
             Bundle result = new Bundle();
             result.putInt("points", isStandaloneMode ? standaloneScore : 0);
             result.putBoolean("finished", true);
+            result.putBoolean("forfeit", forfeitBy != null);
             getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
         });
     }

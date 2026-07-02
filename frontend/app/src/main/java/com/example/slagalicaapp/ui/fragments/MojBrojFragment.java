@@ -51,6 +51,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
     private int cumulativePoints = 0;
     private int player2Points = 0;
     private boolean iWon = false;
+    private boolean finishedByForfeit = false;
 
     private SensorManager sensorManager;
     private float acceleration = 0f;
@@ -203,6 +204,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
                     @Override
                     public void onGameFinished(int p1Score, int p2Score, String forfeitBy) {
                         requireActivity().runOnUiThread(() -> {
+                            finishedByForfeit = forfeitBy != null && !forfeitBy.isEmpty();
                             if (gameTimer != null) gameTimer.cancel();
                             player1Points = p1Score;
                             player2Points = p2Score;
@@ -428,6 +430,7 @@ public class MojBrojFragment extends Fragment implements SensorEventListener {
         Bundle result = new Bundle();
         result.putString("game", "MOJ_BROJ");
         result.putBoolean("iWon", iWon);
+        result.putBoolean("forfeit", finishedByForfeit);
         getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
     }
 

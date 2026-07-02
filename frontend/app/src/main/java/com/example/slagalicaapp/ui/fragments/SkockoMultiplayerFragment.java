@@ -70,6 +70,7 @@ public class SkockoMultiplayerFragment extends Fragment {
     private boolean isStandaloneMode = false;
     private int standaloneScore = 0;
     private int cumulativePoints = 0;
+    private boolean finishedByForfeit = false;
 
     // Scores (kept in sync with Firebase)
     private int p1Score = 0;
@@ -409,6 +410,7 @@ public class SkockoMultiplayerFragment extends Fragment {
 
     private void finishGame(int p1, int p2, String forfeitBy) {
         isGameOver = true;
+        finishedByForfeit = forfeitBy != null && !forfeitBy.isEmpty();
         p1Score = p1; p2Score = p2;
         headerController.setScores(p1Score, p2Score);
         cancelPhaseTimer();
@@ -459,6 +461,7 @@ public class SkockoMultiplayerFragment extends Fragment {
         Bundle result = new Bundle();
         result.putInt("points", isStandaloneMode ? standaloneScore : 0);
         result.putString("game", "SKOCKO");
+        result.putBoolean("forfeit", finishedByForfeit);
         getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
     }
 

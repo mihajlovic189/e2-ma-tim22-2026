@@ -192,6 +192,7 @@ public class SpojniceMultiplayerFragment extends Fragment implements SpojniceMan
 
             Bundle result = new Bundle();
             result.putBoolean("finished", true);
+            result.putBoolean("forfeit", forfeitBy != null);
             getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
         });
     }

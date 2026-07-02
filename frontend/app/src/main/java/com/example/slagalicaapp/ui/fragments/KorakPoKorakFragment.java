@@ -45,6 +45,7 @@ public class KorakPoKorakFragment extends Fragment {
 
     private int player1TotalPoints = 0;
     private int player2TotalPoints = 0;
+    private boolean finishedByForfeit = false;
 
     private CountDownTimer mainGameTimer;
     private CountDownTimer opponentTimer;
@@ -204,6 +205,7 @@ public class KorakPoKorakFragment extends Fragment {
                     public void onGameFinished(int p1Score, int p2Score, String forfeitBy, boolean solved) {
                         if (!isAdded()) return;
                         requireActivity().runOnUiThread(() -> {
+                            finishedByForfeit = forfeitBy != null && !forfeitBy.isEmpty();
                             if (mainGameTimer != null) mainGameTimer.cancel();
                             if (opponentTimer != null) opponentTimer.cancel();
 
@@ -409,6 +411,7 @@ public class KorakPoKorakFragment extends Fragment {
     private void notifyGameFinished() {
         Bundle result = new Bundle();
         result.putString("game", "KORAK_PO_KORAK");
+        result.putBoolean("forfeit", finishedByForfeit);
         getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
     }
 

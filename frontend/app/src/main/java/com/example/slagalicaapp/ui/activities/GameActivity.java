@@ -97,6 +97,12 @@ public class GameActivity extends AppCompatActivity {
 
         getSupportFragmentManager().setFragmentResultListener(
                 "GAME_FINISHED", this, (requestKey, result) -> {
+                    // Sub-game managers detect the same "status=forfeit" write GameActivity's
+                    // own room listener reacts to, and can still be attached (fragment swap
+                    // via commitAllowingStateLoss() is async) when they fire it — that's a
+                    // stale echo of a forfeit GameActivity already handled, not a real finish.
+                    if (result.getBoolean("forfeit", false)) return;
+
                     // Ako fragment vraća sakupljene poene, dodajemo ih u zbir za izazov
                     if (result.containsKey("points")) {
                         ukupniPoeniIzazova += result.getInt("points");
@@ -658,7 +664,11 @@ public class GameActivity extends AppCompatActivity {
 
     private void ocistiSobuIAzurnoZavrsi() {
         if (roomId != null) {
-            if (hasForfeited || playerNumber == 1) {
+            // playerNumber==1 normally "wins" the cleanup race so both clients don't try to
+            // delete the same room when a match ends normally (both reach this ~simultaneously).
+            // In soloMode the opponent already forfeited and is gone, so whichever player number
+            // I am, I'm the only one left who can ever clean this room up.
+            if (hasForfeited || playerNumber == 1 || soloMode) {
                 roomRef.removeValue().addOnCompleteListener(t -> finish());
             } else {
                 finish();
