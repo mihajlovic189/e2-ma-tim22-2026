@@ -149,22 +149,8 @@ public class ProfileFragment extends Fragment {
     }
 
     private void setLeagueIcon(String leagueName) {
-        String n = leagueName == null ? "" : leagueName.toLowerCase();
-        int iconRes;
-        if (n.contains("master")) {
-            iconRes = R.drawable.ic_trophy;
-        } else if (n.contains("diamond")) {
-            iconRes = R.drawable.ic_diamond;
-        } else if (n.contains("gold")) {
-            iconRes = android.R.drawable.btn_star_big_on;
-        } else if (n.contains("silver")) {
-            iconRes = android.R.drawable.star_big_off;   // swapped: silver gets bronze drawable
-        } else if (n.contains("bronze")) {
-            iconRes = android.R.drawable.star_big_on;    // swapped: bronze gets silver drawable
-        } else {
-            iconRes = android.R.drawable.ic_menu_compass; // Rookie
-        }
-        binding.ivLeagueIcon.setImageResource(iconRes);
+        binding.ivLeagueIcon.setImageResource(
+                com.example.slagalicaapp.utils.LeagueManager.iconDrawableRes(leagueName));
     }
 
     private void showLeagueChangeDialog(String from, String to) {

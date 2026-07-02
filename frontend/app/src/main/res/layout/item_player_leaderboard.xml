@@ -22,13 +22,12 @@
         android:layout_marginStart="10dp"
         android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/tvLeagueIcon"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="18sp"
+        <ImageView
+            android:id="@+id/ivLeagueIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:layout_marginEnd="6dp"
-            android:visibility="visible" />
+            android:contentDescription="@string/profile_league_icon" />
 
         <LinearLayout
             android:layout_width="0dp"

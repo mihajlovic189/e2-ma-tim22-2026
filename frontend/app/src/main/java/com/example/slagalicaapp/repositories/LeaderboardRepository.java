@@ -74,8 +74,9 @@ public class LeaderboardRepository {
                         int stars = ws != null ? ws.intValue() : 0;
                         boolean isCurrentUser = doc.getId().equals(currentUid);
                         PlayerLeaderboardEntry entry = new PlayerLeaderboardEntry(username, stars, isCurrentUser);
-                        String leagueName = doc.getString("leagueName");
-                        entry.setLeagueIcon(LeagueManager.iconForName(leagueName));
+                        Long totalStars = doc.getLong("totalStars");
+                        String leagueName = LeagueManager.forStars(totalStars != null ? totalStars.intValue() : 0).name;
+                        entry.setLeagueIconRes(LeagueManager.iconDrawableRes(leagueName));
                         entries.add(entry);
                     }
                     entries.sort((a, b) -> b.getMonthlyStars() - a.getMonthlyStars());
@@ -105,8 +106,9 @@ public class LeaderboardRepository {
                         int stars = ms != null ? ms.intValue() : 0;
                         boolean isCurrentUser = doc.getId().equals(currentUid);
                         PlayerLeaderboardEntry entry = new PlayerLeaderboardEntry(username, stars, isCurrentUser);
-                        String leagueName = doc.getString("leagueName");
-                        entry.setLeagueIcon(LeagueManager.iconForName(leagueName));
+                        Long totalStars = doc.getLong("totalStars");
+                        String leagueName = LeagueManager.forStars(totalStars != null ? totalStars.intValue() : 0).name;
+                        entry.setLeagueIconRes(LeagueManager.iconDrawableRes(leagueName));
                         entries.add(entry);
                     }
                     entries.sort((a, b) -> b.getMonthlyStars() - a.getMonthlyStars());

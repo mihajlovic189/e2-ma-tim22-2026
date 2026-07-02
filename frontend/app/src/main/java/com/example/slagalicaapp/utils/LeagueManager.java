@@ -1,5 +1,6 @@
 package com.example.slagalicaapp.utils;
 
+import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.models.League;
 
 import java.util.Arrays;
@@ -26,12 +27,12 @@ public final class LeagueManager {
     private static final float MONTHLY_KEEP_FACTOR = 0.70f;
 
     public static final List<League> LEAGUES = Collections.unmodifiableList(Arrays.asList(
-            new League(0, "Rookie",  "🌱",  0,    0),
-            new League(1, "Bronze",  "🥈",  100,  1),   // 🥈 icon on Bronze (swapped with Silver)
-            new League(2, "Silver",  "🥉",  200,  2),   // 🥉 icon on Silver (swapped with Bronze)
-            new League(3, "Gold",    "🥇",  400,  3),
-            new League(4, "Diamond", "💎",  800,  4),
-            new League(5, "Master",  "👑",  1600, 5)
+            new League(0, "Rookie",  0,    0),
+            new League(1, "Bronze",  100,  1),
+            new League(2, "Silver",  200,  2),
+            new League(3, "Gold",    400,  3),
+            new League(4, "Diamond", 800,  4),
+            new League(5, "Master",  1600, 5)
     ));
 
     private LeagueManager() {}
@@ -65,11 +66,17 @@ public final class LeagueManager {
         return LEAGUES.get(0);
     }
 
-    public static String iconForName(String leagueName) {
-        if (leagueName == null) return LEAGUES.get(0).icon;
-        for (League l : LEAGUES) {
-            if (l.name.equalsIgnoreCase(leagueName)) return l.icon;
-        }
-        return LEAGUES.get(0).icon;
+    /**
+     * Drawable resource for a league's icon — the single source of truth so every
+     * screen (profile, leaderboards, ...) renders the exact same icon per league.
+     */
+    public static int iconDrawableRes(String leagueName) {
+        String n = leagueName == null ? "" : leagueName.toLowerCase();
+        if (n.contains("master"))  return R.drawable.ic_trophy;
+        if (n.contains("diamond")) return R.drawable.ic_diamond;
+        if (n.contains("gold"))    return android.R.drawable.btn_star_big_on;
+        if (n.contains("silver"))  return android.R.drawable.star_big_off;  // swapped: silver gets bronze drawable
+        if (n.contains("bronze"))  return android.R.drawable.star_big_on;   // swapped: bronze gets silver drawable
+        return android.R.drawable.ic_menu_compass; // Rookie
     }
 }

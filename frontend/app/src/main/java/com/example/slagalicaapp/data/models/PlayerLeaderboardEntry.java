@@ -5,7 +5,7 @@ public class PlayerLeaderboardEntry {
     private final int monthlyStars;
     private final boolean currentUser;
     private int rank;
-    private String leagueIcon;
+    private int leagueIconRes;
 
     public PlayerLeaderboardEntry(String username, int monthlyStars, boolean currentUser) {
         this.username = username;
@@ -18,6 +18,6 @@ public class PlayerLeaderboardEntry {
     public boolean isCurrentUser() { return currentUser; }
     public int getRank() { return rank; }
     public void setRank(int rank) { this.rank = rank; }
-    public String getLeagueIcon() { return leagueIcon; }
-    public void setLeagueIcon(String leagueIcon) { this.leagueIcon = leagueIcon; }
+    public int getLeagueIconRes() { return leagueIconRes; }
+    public void setLeagueIconRes(int leagueIconRes) { this.leagueIconRes = leagueIconRes; }
 }
