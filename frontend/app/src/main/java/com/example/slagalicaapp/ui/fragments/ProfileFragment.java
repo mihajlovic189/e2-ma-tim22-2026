@@ -3,7 +3,6 @@ package com.example.slagalicaapp.ui.fragments;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -41,19 +40,35 @@ public class ProfileFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         avatarPickerLauncher = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
-            if (uri == null) {
+            if (uri == null || getContext() == null) {
                 return;
             }
 
-            if (binding != null) {
-                binding.ivAvatar.setImageURI(uri);
-            }
+            android.content.ContentResolver resolver = requireContext().getContentResolver();
+            new Thread(() -> {
+                String dataUri = com.example.slagalicaapp.utils.AvatarUtils.encodeFromUri(resolver, uri);
+                if (!isAdded()) return;
 
-            viewModel.updateAvatarUri(uri.toString()).observe(this, msg -> {
-                if (getContext() != null) {
-                    Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-                }
-            });
+                requireActivity().runOnUiThread(() -> {
+                    if (!isAdded() || dataUri == null) {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), "Greška pri obradi slike.", Toast.LENGTH_SHORT).show();
+                        }
+                        return;
+                    }
+
+                    if (binding != null) {
+                        com.example.slagalicaapp.utils.AvatarUtils.apply(
+                                binding.ivAvatar, dataUri, android.R.drawable.sym_def_app_icon);
+                    }
+
+                    viewModel.updateAvatarUri(dataUri).observe(this, msg -> {
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                });
+            }).start();
         });
     }
 
@@ -136,16 +151,8 @@ public class ProfileFragment extends Fragment {
     }
 
     private void setAvatar(String avatarUri) {
-        if (avatarUri == null || avatarUri.trim().isEmpty()) {
-            binding.ivAvatar.setImageResource(android.R.drawable.sym_def_app_icon);
-            return;
-        }
-
-        try {
-            binding.ivAvatar.setImageURI(Uri.parse(avatarUri));
-        } catch (Exception e) {
-            binding.ivAvatar.setImageResource(android.R.drawable.sym_def_app_icon);
-        }
+        com.example.slagalicaapp.utils.AvatarUtils.apply(
+                binding.ivAvatar, avatarUri, android.R.drawable.sym_def_app_icon);
     }
 
     private void setLeagueIcon(String leagueName) {
