@@ -434,7 +434,11 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
 
         Question q = questions.get(currentQuestionIndex);
         int correct = q.getCorrectAnswerIndex();
-        if (chosenIndex == correct) standaloneScore += POINTS_CORRECT;
+        if (chosenIndex == correct) {
+            standaloneScore += POINTS_CORRECT;
+        } else if (chosenIndex != -1) {
+            standaloneScore += POINTS_INCORRECT;
+        }
 
         tvP1Score.setText(String.valueOf(cumulativePoints + standaloneScore));
         highlightAnswers(chosenIndex, -1, correct);
