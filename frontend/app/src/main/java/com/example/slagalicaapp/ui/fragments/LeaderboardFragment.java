@@ -170,14 +170,9 @@ public class LeaderboardFragment extends Fragment {
         if (title == null) title = "Nagrada za plasman!";
         if (body == null) body = "Osvojili ste nagradu na rang listi!";
 
-        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                .setTitle("🎉 " + title)
-                .setMessage(body + "\n\nČestitamo na odličnom rezultatu!")
-                .setCancelable(false)
-                .setPositiveButton("Super! 🎊", (d, w) -> {
-                    if (notifId != null) viewModel.markRewardNotifRead(notifId);
-                })
-                .show();
+        com.example.slagalicaapp.ui.dialogs.RewardDialogHelper.show(requireContext(), title, body, () -> {
+            if (notifId != null) viewModel.markRewardNotifRead(notifId);
+        });
     }
 
     @Override

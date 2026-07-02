@@ -18,6 +18,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
 
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.SlagalicaApp;
@@ -26,6 +28,7 @@ import com.example.slagalicaapp.data.models.GameInvite;
 import com.example.slagalicaapp.notifications.AppNotificationManager;
 import com.example.slagalicaapp.repositories.LeaderboardRepository;
 import com.example.slagalicaapp.repositories.NotificationRepository;
+import com.example.slagalicaapp.ui.dialogs.RewardDialogHelper;
 import com.example.slagalicaapp.ui.fragments.HomeFragment;
 import com.example.slagalicaapp.ui.fragments.LoginFragment;
 import com.google.firebase.auth.FirebaseAuth;
@@ -151,6 +154,33 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Surfaces the animated reward dialog for any unread weekly/monthly cycle reward —
+     * covers both "tapped the reward notification" (which just relaunches this activity)
+     * and "opened the app after a cycle ended" without needing to visit the Leaderboard.
+     */
+    private void checkAndShowPendingReward() {
+        if (isFinishing() || isDestroyed()) return;
+
+        LeaderboardRepository repo = new LeaderboardRepository();
+        LiveData<Map<String, Object>> ld = repo.getPendingReward();
+        ld.observe(this, new Observer<Map<String, Object>>() {
+            @Override
+            public void onChanged(Map<String, Object> reward) {
+                ld.removeObserver(this);
+                if (reward == null || isFinishing() || isDestroyed()) return;
+
+                String title = (String) reward.get("title");
+                String body = (String) reward.get("body");
+                String notifId = (String) reward.get("id");
+
+                RewardDialogHelper.show(MainActivity.this, title, body, () -> {
+                    if (notifId != null) repo.markRewardNotifRead(notifId);
+                });
+            }
+        });
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -223,7 +253,8 @@ public class MainActivity extends AppCompatActivity {
                 startNotifListener(uid);
 
                 proveriIDodeliDnevneTokene();
-                new LeaderboardRepository().checkAndDistributeRewards(MainActivity.this, null);
+                new LeaderboardRepository().checkAndDistributeRewards(
+                        MainActivity.this, MainActivity.this::checkAndShowPendingReward);
             }
         };
         FirebaseAuth.getInstance().addAuthStateListener(authStateListener);
@@ -539,6 +570,7 @@ public class MainActivity extends AppCompatActivity {
 
                         String type  = doc.getString("type");
                         if ("chat".equals(type)) continue; // handled by prikažiLokalnuChatNotifikaciju
+                        if ("rewards".equals(type)) continue; // already shown directly by saveRewardNotification
 
                         String title = doc.getString("title");
                         String body  = doc.getString("body");
