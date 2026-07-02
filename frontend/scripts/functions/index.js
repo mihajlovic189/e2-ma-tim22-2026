@@ -74,18 +74,19 @@ exports.sendDirectNotification = functions.firestore
         const fcmToken = userDoc.data().fcmToken;
         if (!fcmToken) return null;
 
-        const fcmPayload = {
+        const message = {
+            token: fcmToken,
             data: {
                 title:  data.title || '',
                 body:   data.body  || '',
                 type:   data.type  || 'other',
                 source: 'direct_fcm'  // tells onMessageReceived not to re-save to Firestore
             },
-            priority: 'high'
+            android: { priority: 'high' }
         };
 
         try {
-            await admin.messaging().sendToDevice(fcmToken, fcmPayload);
+            await admin.messaging().send(message);
             console.log(`Direct FCM sent to user ${uid} for type "${data.type}"`);
         } catch (error) {
             console.error('Failed to send direct FCM:', error);

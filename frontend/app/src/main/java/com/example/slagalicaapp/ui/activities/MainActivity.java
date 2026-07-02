@@ -511,6 +511,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // timestamp is set client-side on the sender's device (see ChatManager.sendMessage),
+    // so comparing it against this device's own clock can drop genuinely-new messages
+    // when the two devices' clocks disagree. This grace window absorbs typical drift.
+    private static final long CLOCK_SKEW_GRACE_MS = 60_000L;
+
     private void startBackgroundChatNotificationListener(String myUid, String region) {
         if (backgroundChatListener != null) return;
 
@@ -522,7 +527,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
                 Long timestamp = snapshot.child("timestamp").getValue(Long.class);
-                if (timestamp == null || timestamp < chatListenerStartTime) return;
+                if (timestamp == null || timestamp < chatListenerStartTime - CLOCK_SKEW_GRACE_MS) return;
 
                 String senderId   = snapshot.child("senderId").getValue(String.class);
                 String senderName = snapshot.child("senderName").getValue(String.class);
