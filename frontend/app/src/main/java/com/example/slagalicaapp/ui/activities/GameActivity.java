@@ -202,10 +202,27 @@ public class GameActivity extends AppCompatActivity {
                 else if (GAME_SKOCKO.equals(currentSubGame))   nextGame = GAME_KORAK;
                 else nextGame = GAME_MOJ_BROJ;
 
-                Map<String, Object> transition = new HashMap<>();
-                transition.put("currentGameType", nextGame);
-                transition.put("status", "playing");
-                roomRef.updateChildren(transition);
+                // Snapshot the cumulative score at the moment this sub-game ends, so the
+                // per-sub-game contribution can be recovered later (scores/player1-2 is a
+                // single running total shared across all six sub-games).
+                String finishedSubGame = currentSubGame;
+                roomRef.child("scores").get()
+                        .addOnSuccessListener(scoresSnap -> {
+                            Map<String, Object> transition = new HashMap<>();
+                            transition.put("currentGameType", nextGame);
+                            transition.put("status", "playing");
+                            transition.put("subGameScores/" + finishedSubGame + "/player1",
+                                    readLong(scoresSnap.child("player1").getValue(), 0L));
+                            transition.put("subGameScores/" + finishedSubGame + "/player2",
+                                    readLong(scoresSnap.child("player2").getValue(), 0L));
+                            roomRef.updateChildren(transition);
+                        })
+                        .addOnFailureListener(e -> {
+                            Map<String, Object> transition = new HashMap<>();
+                            transition.put("currentGameType", nextGame);
+                            transition.put("status", "playing");
+                            roomRef.updateChildren(transition);
+                        });
             }
         }
     }
@@ -629,7 +646,7 @@ public class GameActivity extends AppCompatActivity {
 
         long durationMs = Math.max(0L, finishedAt - startedAt);
 
-        return new GameResult(
+        GameResult result = new GameResult(
                 gameType,
                 player1Uid,
                 player1Name,
@@ -642,6 +659,54 @@ public class GameActivity extends AppCompatActivity {
                 durationMs,
                 6
         );
+
+        if (GAME_MECH.equals(gameType)) {
+            result.subGameScores = buildSubGameScoreBreakdown(snapshot, player1Score, player2Score);
+        }
+
+        return result;
+    }
+
+    private static final String[] SUBGAME_SEQUENCE = {
+            GAME_KO_ZNA_ZNA, GAME_SPOJNICE, GAME_ASOCIJACIJE, GAME_SKOCKO, GAME_KORAK, GAME_MOJ_BROJ
+    };
+
+    /**
+     * scores/player1-2 is one running total shared by all six sub-games. subGameScores/{TYPE}
+     * holds that running total as it stood right when TYPE finished, so each sub-game's own
+     * contribution is the difference from the previous sub-game's checkpoint. If the match ended
+     * (e.g. forfeit) before a sub-game's checkpoint was written, decomposition stops there.
+     */
+    private Map<String, Map<String, Long>> buildSubGameScoreBreakdown(DataSnapshot snapshot, int finalP1, int finalP2) {
+        Map<String, Map<String, Long>> breakdown = new HashMap<>();
+        DataSnapshot checkpoints = snapshot.child("subGameScores");
+
+        long prevP1 = 0L, prevP2 = 0L;
+        for (int i = 0; i < SUBGAME_SEQUENCE.length; i++) {
+            String type = SUBGAME_SEQUENCE[i];
+            boolean isLast = i == SUBGAME_SEQUENCE.length - 1;
+
+            long cumP1, cumP2;
+            if (isLast) {
+                cumP1 = finalP1;
+                cumP2 = finalP2;
+            } else {
+                DataSnapshot checkpoint = checkpoints.child(type);
+                if (!checkpoint.exists()) break;
+                cumP1 = readLong(checkpoint.child("player1").getValue(), prevP1);
+                cumP2 = readLong(checkpoint.child("player2").getValue(), prevP2);
+            }
+
+            Map<String, Long> delta = new HashMap<>();
+            delta.put("player1", Math.max(0L, cumP1 - prevP1));
+            delta.put("player2", Math.max(0L, cumP2 - prevP2));
+            breakdown.put(type, delta);
+
+            prevP1 = cumP1;
+            prevP2 = cumP2;
+        }
+
+        return breakdown;
     }
 
     private int readInt(Object value, int fallback) {

@@ -1,5 +1,7 @@
 package com.example.slagalicaapp.model;
 
+import java.util.Map;
+
 public class GameResult {
     public String gameType;
     public String player1Uid;
@@ -12,6 +14,10 @@ public class GameResult {
     public long timestamp;
     public long durationMs;
     public int questionsCount;
+
+    // Only populated for SLAGALICA_MECH matches: per-sub-game score breakdown,
+    // keyed by sub-game type (e.g. "KO_ZNA_ZNA"), each holding "player1"/"player2" deltas.
+    public Map<String, Map<String, Long>> subGameScores;
 
     public GameResult() {
         // empty constructor required for Firebase
