@@ -178,7 +178,7 @@ public class ProfileFragment extends Fragment {
         // Save notification to history and update Firestore so it doesn't trigger again
         com.example.slagalicaapp.repositories.NotificationRepository repo =
                 new com.example.slagalicaapp.repositories.NotificationRepository();
-        repo.save(title, message.replace("\n", " "), "other");
+        repo.save(title, message.replace("\n", " "), "ranking");
 
         com.google.firebase.auth.FirebaseUser user =
                 com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
