@@ -63,6 +63,7 @@ public class GameActivity extends AppCompatActivity {
     private String playerName;
     private boolean hasForfeited = false;
     private boolean finalResultSaved = false;
+    private boolean isFriendlyMatch = false;
 
     // Lokalni brojač poena za samostalno igranje u Izazovu
     private int ukupniPoeniIzazova = 0;
@@ -250,6 +251,8 @@ public class GameActivity extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 String p1Uid = snapshot.child("player1Uid").getValue(String.class);
                 String p2Uid = snapshot.child("player2Uid").getValue(String.class);
+                Boolean friendly = snapshot.child("isFriendly").getValue(Boolean.class);
+                isFriendlyMatch = friendly != null && friendly;
 
                 FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
                 String uid = user != null ? user.getUid() : null;
@@ -354,6 +357,12 @@ public class GameActivity extends AppCompatActivity {
     private void primenikaznuZbogNapustanja() {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null) {
+            finish();
+            return;
+        }
+
+        if (isFriendlyMatch) {
+            Toast.makeText(GameActivity.this, "Napustili ste prijateljsku partiju.", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
