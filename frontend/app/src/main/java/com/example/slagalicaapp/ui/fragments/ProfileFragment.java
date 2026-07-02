@@ -3,7 +3,6 @@ package com.example.slagalicaapp.ui.fragments;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -41,19 +40,35 @@ public class ProfileFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         avatarPickerLauncher = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
-            if (uri == null) {
+            if (uri == null || getContext() == null) {
                 return;
             }
 
-            if (binding != null) {
-                binding.ivAvatar.setImageURI(uri);
-            }
+            android.content.ContentResolver resolver = requireContext().getContentResolver();
+            new Thread(() -> {
+                String dataUri = com.example.slagalicaapp.utils.AvatarUtils.encodeFromUri(resolver, uri);
+                if (!isAdded()) return;
 
-            viewModel.updateAvatarUri(uri.toString()).observe(this, msg -> {
-                if (getContext() != null) {
-                    Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-                }
-            });
+                requireActivity().runOnUiThread(() -> {
+                    if (!isAdded() || dataUri == null) {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), "Greška pri obradi slike.", Toast.LENGTH_SHORT).show();
+                        }
+                        return;
+                    }
+
+                    if (binding != null) {
+                        com.example.slagalicaapp.utils.AvatarUtils.apply(
+                                binding.ivAvatar, dataUri, android.R.drawable.sym_def_app_icon);
+                    }
+
+                    viewModel.updateAvatarUri(dataUri).observe(this, msg -> {
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                });
+            }).start();
         });
     }
 
@@ -136,42 +151,20 @@ public class ProfileFragment extends Fragment {
     }
 
     private void setAvatar(String avatarUri) {
-        if (avatarUri == null || avatarUri.trim().isEmpty()) {
-            binding.ivAvatar.setImageResource(android.R.drawable.sym_def_app_icon);
-            return;
-        }
-
-        try {
-            binding.ivAvatar.setImageURI(Uri.parse(avatarUri));
-        } catch (Exception e) {
-            binding.ivAvatar.setImageResource(android.R.drawable.sym_def_app_icon);
-        }
+        com.example.slagalicaapp.utils.AvatarUtils.apply(
+                binding.ivAvatar, avatarUri, android.R.drawable.sym_def_app_icon);
     }
 
     private void setLeagueIcon(String leagueName) {
-        String n = leagueName == null ? "" : leagueName.toLowerCase();
-        int iconRes;
-        if (n.contains("master")) {
-            iconRes = R.drawable.ic_trophy;
-        } else if (n.contains("diamond")) {
-            iconRes = R.drawable.ic_diamond;
-        } else if (n.contains("gold")) {
-            iconRes = android.R.drawable.btn_star_big_on;
-        } else if (n.contains("silver")) {
-            iconRes = android.R.drawable.star_big_off;   // swapped: silver gets bronze drawable
-        } else if (n.contains("bronze")) {
-            iconRes = android.R.drawable.star_big_on;    // swapped: bronze gets silver drawable
-        } else {
-            iconRes = android.R.drawable.ic_menu_compass; // Rookie
-        }
-        binding.ivLeagueIcon.setImageResource(iconRes);
+        binding.ivLeagueIcon.setImageResource(
+                com.example.slagalicaapp.utils.LeagueManager.iconDrawableRes(leagueName));
     }
 
     private void showLeagueChangeDialog(String from, String to) {
         if (!isAdded() || getContext() == null) return;
 
         boolean promoted = isPromotion(from, to);
-        String title   = promoted ? "🎉 Napredovanje u ligi!" : "⬇ Pad u ligi";
+        String title   = promoted ? "Napredovanje u ligi!" : "Pad u ligi";
         String message = promoted
                 ? "Čestitamo! Napredovao si iz lige\n\"" + from + "\"\nu ligu\n\"" + to + "\"!"
                 : "Pao si iz lige\n\"" + from + "\"\nu ligu\n\"" + to + "\".";
@@ -181,6 +174,19 @@ public class ProfileFragment extends Fragment {
                 .setMessage(message)
                 .setPositiveButton("U redu", null)
                 .show();
+
+        // Save notification to history and update Firestore so it doesn't trigger again
+        com.example.slagalicaapp.repositories.NotificationRepository repo =
+                new com.example.slagalicaapp.repositories.NotificationRepository();
+        repo.save(title, message.replace("\n", " "), "ranking");
+
+        com.google.firebase.auth.FirebaseUser user =
+                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").document(user.getUid())
+                    .update("leagueName", to);
+        }
     }
 
     private boolean isPromotion(String from, String to) {

@@ -1,6 +1,5 @@
 package com.example.slagalicaapp.ui.adapters;
 
-import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.models.FriendData;
+import com.example.slagalicaapp.utils.AvatarUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,12 +59,7 @@ public class FriendsAdapter extends RecyclerView.Adapter<FriendsAdapter.VH> {
         h.tvMonthly.setText("Mesečno: " + fd.getMonthlyStars());
 
         // Avatar
-        if (fd.getAvatarUri() != null && !fd.getAvatarUri().isEmpty()) {
-            try { h.ivAvatar.setImageURI(Uri.parse(fd.getAvatarUri())); }
-            catch (Exception e) { h.ivAvatar.setImageResource(android.R.drawable.sym_def_app_icon); }
-        } else {
-            h.ivAvatar.setImageResource(android.R.drawable.sym_def_app_icon);
-        }
+        AvatarUtils.apply(h.ivAvatar, fd.getAvatarUri(), android.R.drawable.sym_def_app_icon);
 
         // Online status dot
         if (fd.isInGame()) {

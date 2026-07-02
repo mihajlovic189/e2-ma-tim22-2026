@@ -171,6 +171,14 @@ public class SpojniceManager {
                     return Transaction.abort();
                 }
 
+                // The starting player may not retry an item they already failed this round —
+                // that item belongs to the other player's steal attempt now.
+                int startingPlayerForRound = (round % 2) + 1;
+                if (playerNum == startingPlayerForRound &&
+                    data.child("spojnice/failed").child(String.valueOf(round)).child(String.valueOf(leftIdx)).getValue() != null) {
+                    return Transaction.abort();
+                }
+
                 long now = System.currentTimeMillis();
 
                 if (isCorrect) {
@@ -179,10 +187,17 @@ public class SpojniceManager {
                     Long currentScore = data.child("scores/player" + playerNum).getValue(Long.class);
                     data.child("scores/player" + playerNum).setValue((currentScore != null ? currentScore : 0) + 2);
 
-                    long resolvedCount = data.child("spojnice/resolved").child(String.valueOf(round)).getChildrenCount();
-                    long lostCount     = data.child("spojnice/lost").child(String.valueOf(round)).getChildrenCount();
-                    if (resolvedCount + lostCount >= totalPairCount) {
-                        advanceRoundOrFinish(data, round, now);
+                    if (playerNum == startingPlayerForRound) {
+                        // Solving their last unattempted item still leaves any already-failed
+                        // item unresolved — that must hand off to the other player to steal,
+                        // not just check resolved+lost (which a failed item never joins).
+                        advanceTurnIfStartingPlayerDone(data, round, playerNum, totalPairCount, now);
+                    } else {
+                        long resolvedCount = data.child("spojnice/resolved").child(String.valueOf(round)).getChildrenCount();
+                        long lostCount     = data.child("spojnice/lost").child(String.valueOf(round)).getChildrenCount();
+                        if (resolvedCount + lostCount >= totalPairCount) {
+                            advanceRoundOrFinish(data, round, now);
+                        }
                     }
                 } else {
                     handleTurnTimeoutOrWrong(data, round, playerNum, leftIdx, totalPairCount, now);
@@ -230,19 +245,7 @@ public class SpojniceManager {
                 }
             }
 
-            long failedCount = data.child("spojnice/failed").child(String.valueOf(round)).getChildrenCount();
-
-            if (resolvedCount + failedCount >= totalPairCount) {
-                // Player 1 attempted everything
-                if (failedCount > 0) {
-                    int nextPlayer = 3 - playerNum;
-                    data.child("spojnice/currentPlayer").setValue(nextPlayer);
-                    data.child("spojnice/turnEndsAt").setValue(now + 30_000L);
-                } else {
-                    advanceRoundOrFinish(data, round, now);
-                }
-            }
-            // else: Player 1 still has unattempted items — leave currentPlayer unchanged
+            advanceTurnIfStartingPlayerDone(data, round, playerNum, totalPairCount, now);
 
         } else {
             // Player 2 wrong / timeout — mark lost, Player 2 continues with remaining items
@@ -273,6 +276,25 @@ public class SpojniceManager {
                 advanceRoundOrFinish(data, round, now);
             }
         }
+    }
+
+    // Shared by both the correct-guess and wrong/timeout paths so a starting player who
+    // finishes their attempts by solving their last item (rather than failing it) still
+    // hands off to the other player when a failed item is left waiting to be stolen.
+    private void advanceTurnIfStartingPlayerDone(MutableData data, int round, int playerNum, int totalPairCount, long now) {
+        long resolvedCount = data.child("spojnice/resolved").child(String.valueOf(round)).getChildrenCount();
+        long failedCount   = data.child("spojnice/failed").child(String.valueOf(round)).getChildrenCount();
+
+        if (resolvedCount + failedCount >= totalPairCount) {
+            if (failedCount > 0) {
+                int nextPlayer = 3 - playerNum;
+                data.child("spojnice/currentPlayer").setValue(nextPlayer);
+                data.child("spojnice/turnEndsAt").setValue(now + 30_000L);
+            } else {
+                advanceRoundOrFinish(data, round, now);
+            }
+        }
+        // else: starting player still has unattempted items — leave currentPlayer unchanged
     }
 
     private void advanceRoundOrFinish(MutableData data, int round, long now) {

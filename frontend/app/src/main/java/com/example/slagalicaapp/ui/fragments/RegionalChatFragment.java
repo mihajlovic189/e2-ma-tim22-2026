@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import com.example.slagalicaapp.data.firebase.ChatManager;
 import com.example.slagalicaapp.data.models.ChatMessage;
 import com.example.slagalicaapp.databinding.FragmentRegionalChatBinding;
+import com.example.slagalicaapp.repositories.DailyMissionsRepository;
 import com.example.slagalicaapp.ui.adapters.ChatAdapter;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -86,6 +87,20 @@ public class RegionalChatFragment extends Fragment implements ChatManager.ChatLi
             if (!TextUtils.isEmpty(text) && chatManager != null) {
                 chatManager.sendMessage(currentUserId, currentUserName, text);
                 binding.etMessageInput.setText("");
+                new DailyMissionsRepository().completeMission("sendChat", new DailyMissionsRepository.MissionCallback() {
+                    @Override
+                    public void onSuccess(boolean newlyCompleted) {
+                        if (isAdded() && newlyCompleted) {
+                            Toast.makeText(getContext(), "Misija 'Pošalji poruku' završena! +3⭐", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                    @Override
+                    public void onError(String error) {
+                        if (isAdded()) {
+                            Toast.makeText(getContext(), "Greška: " + error, Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
             }
         });
     }

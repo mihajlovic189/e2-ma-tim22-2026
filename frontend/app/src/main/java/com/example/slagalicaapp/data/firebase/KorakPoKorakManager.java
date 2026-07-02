@@ -181,7 +181,37 @@ public class KorakPoKorakManager {
         }
     }
 
-    public void startNextRoundIfReady(int nextActivePlayer) {
+    // Guarded by a transaction on the whole rounds node so a re-entrant call (e.g. the
+    // fragment getting recreated on player1's device) can never clobber puzzle data
+    // that a client may have already latched onto. Solution AND steps for both rounds
+    // are written inside the SAME transaction so no listener can ever observe a state
+    // where the solution exists but the steps haven't arrived yet (that gap is what
+    // made the step fields show up blank while the solution was already known).
+    public void writeRoundsData(String r1Solution, java.util.List<String> r1Steps,
+                                 String r2Solution, java.util.List<String> r2Steps) {
+        roomRef.child("korakPoKorak/rounds").runTransaction(new Transaction.Handler() {
+            @Override
+            public Transaction.Result doTransaction(MutableData data) {
+                if (data.child("1").child("solution").getValue() != null) {
+                    return Transaction.abort();
+                }
+                data.child("1").child("solution").setValue(r1Solution);
+                for (int i = 0; i < r1Steps.size(); i++) {
+                    data.child("1").child("steps").child(String.valueOf(i)).setValue(r1Steps.get(i));
+                }
+                data.child("2").child("solution").setValue(r2Solution);
+                for (int i = 0; i < r2Steps.size(); i++) {
+                    data.child("2").child("steps").child(String.valueOf(i)).setValue(r2Steps.get(i));
+                }
+                return Transaction.success(data);
+            }
+
+            @Override
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {}
+        });
+    }
+
+    public void startNextRoundIfReady(int nextActivePlayer, String solution, java.util.List<String> steps) {
         roomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
@@ -191,6 +221,7 @@ public class KorakPoKorakManager {
                 if (!"round_finished".equals(roundStatus)) return;
 
                 long sledecaRunda = roundVal + 1;
+                String roundKey = "korakPoKorak/rounds/" + sledecaRunda;
 
                 Map<String, Object> update = new HashMap<>();
                 update.put("korakPoKorak/currentRound", sledecaRunda);
@@ -200,6 +231,13 @@ public class KorakPoKorakManager {
                 update.put("korakPoKorak/lastWrongAnswer", null);
                 update.put("korakPoKorak/lastRoundSolved", null);
                 update.put("korakPoKorak/lastSolvedBy", null);
+                // Write puzzle data for round 2 so the listener's isRoundReady() check passes
+                update.put(roundKey + "/solution", solution);
+                if (steps != null) {
+                    for (int i = 0; i < steps.size(); i++) {
+                        update.put(roundKey + "/steps/" + i, steps.get(i));
+                    }
+                }
                 roomRef.updateChildren(update);
             }
 

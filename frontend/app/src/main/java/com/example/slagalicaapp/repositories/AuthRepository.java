@@ -42,7 +42,8 @@ public class AuthRepository {
             "asocijacije_results",
             "ko_zna_zna_results",
             "skocko_results",
-            "spojnice_results"
+            "spojnice_results",
+            "slagalica_match_results"
     };
 
     // ──────────────────────────────────────────────
@@ -445,9 +446,6 @@ public class AuthRepository {
                                Map<String, List<GameResult>> byType,
                                MutableLiveData<ProfileData> result) {
 
-        profileData.setAverageScoreRanges(computeAverageScoreRanges(uid, byType));
-        profileData.setDetailedStats(computeDetailedStats(uid, byType));
-
         int totalGames = 0, wins = 0, losses = 0;
         for (List<GameResult> games : byType.values()) {
             for (GameResult gr : games) {
@@ -457,12 +455,49 @@ public class AuthRepository {
             }
         }
 
+        // SLAGALICA_MECH matches are stored as one combined record (one "game played"),
+        // but carry a per-sub-game score breakdown used only for the category rows below —
+        // expanding them here must not change the totals computed above.
+        Map<String, List<GameResult>> enrichedByType = decomposeMechMatches(byType);
+
+        profileData.setAverageScoreRanges(computeAverageScoreRanges(uid, enrichedByType));
+        profileData.setDetailedStats(computeDetailedStats(uid, totalGames, wins, enrichedByType));
+
         profileData.setTotalGamesPlayed(totalGames);
         profileData.setWins(wins);
         profileData.setLosses(losses);
 
         persistComputedStats(uid, profileData);
         result.setValue(profileData);
+    }
+
+    private Map<String, List<GameResult>> decomposeMechMatches(Map<String, List<GameResult>> byType) {
+        Map<String, List<GameResult>> enriched = new HashMap<>();
+        for (Map.Entry<String, List<GameResult>> entry : byType.entrySet()) {
+            enriched.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+
+        List<GameResult> mechMatches = byType.get("slagalica_mech");
+        if (mechMatches == null) return enriched;
+
+        for (GameResult match : mechMatches) {
+            if (match.subGameScores == null) continue;
+            for (Map.Entry<String, Map<String, Long>> sub : match.subGameScores.entrySet()) {
+                Map<String, Long> scores = sub.getValue();
+                if (scores == null) continue;
+                String subType = sub.getKey().toLowerCase().trim();
+                long p1 = scores.getOrDefault("player1", 0L);
+                long p2 = scores.getOrDefault("player2", 0L);
+
+                GameResult decomposed = new GameResult(
+                        subType, match.player1Uid, match.player1Name, (int) p1,
+                        match.player2Uid, match.player2Name, (int) p2,
+                        null, match.timestamp, match.durationMs, match.questionsCount);
+
+                enriched.computeIfAbsent(subType, k -> new ArrayList<>()).add(decomposed);
+            }
+        }
+        return enriched;
     }
 
     // ──────────────────────────────────────────────
@@ -504,14 +539,13 @@ public class AuthRepository {
         return ranges;
     }
 
-    private Map<String, String> computeDetailedStats(String uid,
+    private Map<String, String> computeDetailedStats(String uid, int totalGames, int wins,
                                                      Map<String, List<GameResult>> byType) {
         Map<String, String> stats = new LinkedHashMap<>();
 
         // ── Ko zna zna ──
         List<GameResult> kzz = byType.getOrDefault("ko_zna_zna", new ArrayList<>());
         if (!kzz.isEmpty()) {
-            int totalGames = kzz.size();
             int totalScore = 0, maxPossibleScore = 0;
             for (GameResult gr : kzz) {
                 int myScore  = uid.equals(gr.player1Uid) ? gr.player1Score : gr.player2Score;
@@ -606,14 +640,6 @@ public class AuthRepository {
         }
 
         // ── Opšte statistike ──
-        int totalGames = byType.values().stream().mapToInt(List::size).sum();
-        int wins = 0;
-        for (List<GameResult> games : byType.values()) {
-            for (GameResult gr : games) {
-                if (uid.equals(gr.winnerUid)) wins++;
-            }
-        }
-
         stats.put("Ukupno odigranih partija", String.valueOf(totalGames));
         if (totalGames > 0) {
             int winPct  = wins * 100 / totalGames;

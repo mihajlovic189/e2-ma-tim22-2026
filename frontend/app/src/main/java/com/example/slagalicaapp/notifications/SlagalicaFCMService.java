@@ -5,7 +5,10 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.example.slagalicaapp.SlagalicaApp;
-import com.example.slagalicaapp.repositories.NotificationStore;
+import com.example.slagalicaapp.repositories.NotificationRepository;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -17,28 +20,61 @@ public class SlagalicaFCMService extends FirebaseMessagingService {
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
 
-        String title = null;
-        String body  = null;
-        String type  = "other";
+        String source = remoteMessage.getData().get("source");
+        String title  = null;
+        String body   = null;
+        String type   = "other";
 
         if (remoteMessage.getNotification() != null) {
             title = remoteMessage.getNotification().getTitle();
             body  = remoteMessage.getNotification().getBody();
         }
-
         if (remoteMessage.getData().size() > 0) {
             if (title == null) title = remoteMessage.getData().get("title");
             if (body  == null) body  = remoteMessage.getData().get("body");
             String dataType = remoteMessage.getData().get("type");
             if (dataType != null) type = dataType;
         }
+        if (title == null || body == null) return;
 
-        if (title != null && body != null) {
-            String channel = channelForType(type);
-            AppNotificationManager.show(getApplicationContext(), channel, title, body);
-            NotificationStore.save(getApplicationContext(), title, body, type);
-            Log.d(TAG, "Notification saved locally: type=" + type);
+        if ("direct_fcm".equals(source)) {
+            // Cloud function already wrote this to Firestore — do NOT save again.
+            // FCM is the sole provider of system notifications when app is not visible.
+            // (Relying on client-side listeners for this is unreliable because Android
+            // can throttle or drop background network connections in Doze/standby mode.)
+            if (!SlagalicaApp.isAppInForeground) {
+                AppNotificationManager.show(getApplicationContext(), channelForType(type), title, body);
+                Log.d(TAG, "System notification shown (background/killed path): type=" + type);
+            }
+        } else {
+            // Any other source: save to Firestore and notify.
+            new NotificationRepository().save(title, body, type);
+            Log.d(TAG, "Notification saved to Firestore: type=" + type);
+            if (!SlagalicaApp.isAppInForeground) {
+                AppNotificationManager.show(getApplicationContext(), channelForType(type), title, body);
+            }
         }
+    }
+
+    @Override
+    public void onNewToken(@NonNull String token) {
+        super.onNewToken(token);
+        Log.d(TAG, "Refreshed token: " + token);
+        saveFcmToken(token);
+    }
+
+    private void saveFcmToken(String token) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) return;
+        FirebaseFirestore.getInstance()
+                .collection("users").document(user.getUid())
+                .update("fcmToken", token)
+                .addOnFailureListener(e ->
+                        FirebaseFirestore.getInstance()
+                                .collection("users").document(user.getUid())
+                                .set(java.util.Collections.singletonMap("fcmToken", token),
+                                        com.google.firebase.firestore.SetOptions.merge())
+                );
     }
 
     private String channelForType(String type) {
@@ -48,11 +84,5 @@ public class SlagalicaFCMService extends FirebaseMessagingService {
             case "rewards": return SlagalicaApp.CHANNEL_REWARDS;
             default:        return SlagalicaApp.CHANNEL_OTHER;
         }
-    }
-
-    @Override
-    public void onNewToken(@NonNull String token) {
-        super.onNewToken(token);
-        Log.d(TAG, "Refreshed token: " + token);
     }
 }

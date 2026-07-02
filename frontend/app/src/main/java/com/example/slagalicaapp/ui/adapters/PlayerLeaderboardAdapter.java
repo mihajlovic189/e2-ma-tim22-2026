@@ -4,6 +4,7 @@ import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -42,13 +43,15 @@ public class PlayerLeaderboardAdapter extends RecyclerView.Adapter<PlayerLeaderb
 
     static class VH extends RecyclerView.ViewHolder {
         final TextView tvRank, tvUsername, tvStars, tvMe;
+        final ImageView ivLeagueIcon;
 
         VH(View v) {
             super(v);
-            tvRank     = v.findViewById(R.id.tvPlayerRank);
-            tvUsername = v.findViewById(R.id.tvPlayerUsername);
-            tvStars    = v.findViewById(R.id.tvPlayerStars);
-            tvMe       = v.findViewById(R.id.tvMeBadge);
+            tvRank       = v.findViewById(R.id.tvPlayerRank);
+            tvUsername   = v.findViewById(R.id.tvPlayerUsername);
+            tvStars      = v.findViewById(R.id.tvPlayerStars);
+            tvMe         = v.findViewById(R.id.tvMeBadge);
+            ivLeagueIcon = v.findViewById(R.id.ivLeagueIcon);
         }
 
         void bind(PlayerLeaderboardEntry e) {
@@ -63,6 +66,7 @@ public class PlayerLeaderboardAdapter extends RecyclerView.Adapter<PlayerLeaderb
             tvUsername.setText(e.getUsername());
             tvStars.setText(e.getMonthlyStars() + " ⭐");
             tvMe.setVisibility(e.isCurrentUser() ? View.VISIBLE : View.GONE);
+            ivLeagueIcon.setImageResource(e.getLeagueIconRes());
 
             int bg = e.isCurrentUser() ? Color.parseColor("#1E3A5F") : Color.parseColor("#111827");
             itemView.setBackgroundColor(bg);

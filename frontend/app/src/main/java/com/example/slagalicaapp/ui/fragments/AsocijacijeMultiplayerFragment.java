@@ -206,6 +206,7 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
             Bundle result = new Bundle();
             result.putInt("points", isStandaloneMode ? standaloneScore : 0);
             result.putBoolean("finished", true);
+            result.putBoolean("forfeit", forfeitBy != null);
             getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
         });
     }
@@ -223,14 +224,10 @@ public class AsocijacijeMultiplayerFragment extends Fragment implements Asocijac
         disableAllInput();
         if (isStandaloneMode) {
             onGameFinished(standaloneScore, 0, null);
-        } else if (isCoordinator) {
+        } else {
             String winner = p1Score > p2Score ? "player1"
                           : p2Score > p1Score ? "player2" : "draw";
-            Map<String, Object> upd = new HashMap<>();
-            upd.put("status",     "game_finished");
-            upd.put("winner",     winner);
-            upd.put("finishedAt", System.currentTimeMillis());
-            manager.commitAction(upd);
+            manager.finishRoundByTimeout(winner);
         }
     }
 

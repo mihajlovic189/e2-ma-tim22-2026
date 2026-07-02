@@ -69,7 +69,7 @@ public class FriendsFragment extends Fragment {
         searchAdapter = new FriendsAdapter(FriendsAdapter.Mode.SEARCH, new FriendsAdapter.Callbacks() {
             @Override public void onInviteClick(FriendData f) {}
             @Override public void onAddClick(FriendData f)    { addFriend(f); }
-            @Override public void onRemoveClick(FriendData f) {}
+            @Override public void onRemoveClick(FriendData f) { removeFriend(f); }
         });
 
         binding.rvFriends.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -142,8 +142,13 @@ public class FriendsFragment extends Fragment {
                 .setMessage("Sigurno želiš da ukloniš " + fd.getUsername() + " iz liste prijatelja?")
                 .setPositiveButton("Ukloni", (d, w) ->
                         vm.removeFriend(fd.getUid()).observe(getViewLifecycleOwner(), ok -> {
-                            if (Boolean.TRUE.equals(ok)) loadFriends();
-                            else Toast.makeText(getContext(), "Greška.", Toast.LENGTH_SHORT).show();
+                            if (Boolean.TRUE.equals(ok)) {
+                                fd.setAlreadyFriend(false);
+                                searchAdapter.notifyDataSetChanged();
+                                loadFriends();
+                            } else {
+                                Toast.makeText(getContext(), "Greška.", Toast.LENGTH_SHORT).show();
+                            }
                         }))
                 .setNegativeButton("Otkaži", null)
                 .show();

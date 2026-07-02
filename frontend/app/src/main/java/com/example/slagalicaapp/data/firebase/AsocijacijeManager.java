@@ -66,7 +66,7 @@ public class AsocijacijeManager {
                 String roundStatus = roundSnap.child("status").getValue(String.class);
                 if ("game_finished".equals(roundStatus)) {
                     if (currentRound == 1) {
-                        if (myPlayerNumber == 1) initRound2();
+                        advanceToRound2();
                         return;
                     } else {
                         isGameOver = true;
@@ -79,11 +79,8 @@ public class AsocijacijeManager {
                 }
 
                 if (!gameReadyFired) {
-                    if (myPlayerNumber == 1 && !roundSnap.hasChild("gameEndsAt")) {
-                        Map<String, Object> init = new HashMap<>();
-                        init.put("asocijacije/round" + currentRound + "/gameEndsAt",
-                                System.currentTimeMillis() + ROUND_DURATION_MS);
-                        roomRef.updateChildren(init);
+                    if (!roundSnap.hasChild("gameEndsAt")) {
+                        initRoundTimerIfMissing(currentRound);
                         return;
                     }
                     Long geAt = roundSnap.child("gameEndsAt").getValue(Long.class);
@@ -141,14 +138,68 @@ public class AsocijacijeManager {
         roomRef.addValueEventListener(roomListener);
     }
 
-    private void initRound2() {
-        Map<String, Object> upd = new HashMap<>();
-        upd.put("asocijacije/currentRound", 2);
-        upd.put("asocijacije/round2/activePlayer", 2);
-        upd.put("asocijacije/round2/turnPhase", "opening");
-        upd.put("asocijacije/round2/turnEndsAt", 0L);
-        upd.put("asocijacije/round2/gameEndsAt", System.currentTimeMillis() + ROUND_DURATION_MS);
-        roomRef.updateChildren(upd);
+    // Runs from both players' devices; the transaction abort guard makes it
+    // safe for either (or both) to fire without double-initializing round2.
+    private void advanceToRound2() {
+        roomRef.runTransaction(new Transaction.Handler() {
+            @NonNull
+            @Override
+            public Transaction.Result doTransaction(@NonNull MutableData data) {
+                Long cr = data.child("asocijacije/currentRound").getValue(Long.class);
+                if (cr != null && cr >= 2) return Transaction.abort();
+
+                data.child("asocijacije/currentRound").setValue(2);
+                data.child("asocijacije/round2/activePlayer").setValue(2);
+                data.child("asocijacije/round2/turnPhase").setValue("opening");
+                data.child("asocijacije/round2/turnEndsAt").setValue(0L);
+                data.child("asocijacije/round2/gameEndsAt").setValue(System.currentTimeMillis() + ROUND_DURATION_MS);
+                return Transaction.success(data);
+            }
+
+            @Override
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {}
+        });
+    }
+
+    // Runs from both players' devices; abort guard prevents double-init.
+    private void initRoundTimerIfMissing(int round) {
+        final String rp = "asocijacije/round" + round + "/";
+        roomRef.runTransaction(new Transaction.Handler() {
+            @NonNull
+            @Override
+            public Transaction.Result doTransaction(@NonNull MutableData data) {
+                if (data.child(rp + "gameEndsAt").getValue() != null) return Transaction.abort();
+                data.child(rp + "gameEndsAt").setValue(System.currentTimeMillis() + ROUND_DURATION_MS);
+                return Transaction.success(data);
+            }
+
+            @Override
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {}
+        });
+    }
+
+    // Runs from both players' devices; abort guard prevents a duplicate/late
+    // write from clobbering the round after it has already been closed.
+    public void finishRoundByTimeout(String winner) {
+        if (isGameOver) return;
+        final int round = currentRound;
+        final String rp = "asocijacije/round" + round + "/";
+        roomRef.runTransaction(new Transaction.Handler() {
+            @NonNull
+            @Override
+            public Transaction.Result doTransaction(@NonNull MutableData data) {
+                if ("game_finished".equals(data.child(rp + "status").getValue(String.class))) {
+                    return Transaction.abort();
+                }
+                data.child(rp + "status").setValue("game_finished");
+                data.child(rp + "winner").setValue(winner);
+                data.child(rp + "finishedAt").setValue(System.currentTimeMillis());
+                return Transaction.success(data);
+            }
+
+            @Override
+            public void onComplete(DatabaseError error, boolean committed, DataSnapshot snap) {}
+        });
     }
 
     public void commitAction(Map<String, Object> updates) {

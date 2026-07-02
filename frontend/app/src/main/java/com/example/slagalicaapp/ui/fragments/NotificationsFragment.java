@@ -7,7 +7,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -17,8 +16,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.model.NotificationModel;
-import com.example.slagalicaapp.notifications.DemoNotificationTrigger;
-import com.example.slagalicaapp.repositories.NotificationStore;
+import com.example.slagalicaapp.repositories.NotificationRepository;
 import com.example.slagalicaapp.ui.adapters.NotificationAdapter;
 
 import java.util.ArrayList;
@@ -29,8 +27,11 @@ public class NotificationsFragment extends Fragment {
     private RecyclerView recyclerView;
     private NotificationAdapter adapter;
     private TextView emptyView;
+    private Button btnMarkAll;
 
+    private NotificationRepository repo;
     private final List<NotificationModel> allNotifications = new ArrayList<>();
+
     private String activeTab    = "sve";  // sve | chat | ranking | rewards | other
     private String activeFilter = "sve";  // sve | neprocitane | procitane
 
@@ -43,21 +44,25 @@ public class NotificationsFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_notifications, container, false);
 
+        repo = new NotificationRepository();
+
         recyclerView = view.findViewById(R.id.recycler_view_notifications);
         emptyView    = view.findViewById(R.id.empty_view);
+        btnMarkAll   = view.findViewById(R.id.btnMarkAllRead);
+
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         adapter = new NotificationAdapter(new ArrayList<>(), new NotificationAdapter.NotificationListener() {
             @Override
             public void onMarkRead(NotificationModel n) {
-                NotificationStore.markAsRead(requireContext(), n.getId());
+                repo.oznacKaoProcitanu(n.getId());
                 n.setRead(true);
                 applyFilter();
             }
 
             @Override
             public void onAction(NotificationModel n) {
-                NotificationStore.markAsRead(requireContext(), n.getId());
+                repo.oznacKaoProcitanu(n.getId());
                 n.setRead(true);
                 applyFilter();
                 handleAction(n);
@@ -65,29 +70,36 @@ public class NotificationsFragment extends Fragment {
         });
         recyclerView.setAdapter(adapter);
 
+        if (btnMarkAll != null) {
+            btnMarkAll.setOnClickListener(v -> {
+                repo.oznacSveKaoProcitane();
+                for (NotificationModel n : allNotifications) {
+                    n.setRead(true);
+                }
+                applyFilter();
+            });
+        }
+
         bindTabButtons(view);
         bindFilterButtons(view);
-
-        view.findViewById(R.id.btnAddTest).setOnClickListener(v -> {
-            DemoNotificationTrigger.addTestNotifications(requireContext());
-            loadNotifications();
-            Toast.makeText(getContext(), "Dodane 4 test notifikacije", Toast.LENGTH_SHORT).show();
-        });
 
         return view;
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        loadNotifications();
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        repo.getNotifikacije().observe(getViewLifecycleOwner(), notifications -> {
+            allNotifications.clear();
+            if (notifications != null) allNotifications.addAll(notifications);
+            applyFilter();
+        });
     }
 
-    private void loadNotifications() {
-        if (getContext() == null) return;
-        allNotifications.clear();
-        allNotifications.addAll(NotificationStore.getAll(requireContext()));
-        applyFilter();
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        repo.stopListening();
     }
 
     // ---- Tab buttons ----
@@ -187,26 +199,52 @@ public class NotificationsFragment extends Fragment {
 
         adapter.updateData(filtered);
         boolean empty = filtered.isEmpty();
-        recyclerView.setVisibility(empty ? View.GONE  : View.VISIBLE);
+        recyclerView.setVisibility(empty ? View.GONE   : View.VISIBLE);
         emptyView.setVisibility(empty   ? View.VISIBLE : View.GONE);
     }
 
     // ---- Actions ----
 
     private void handleAction(NotificationModel n) {
+        if (!isAdded()) return;
+
         switch (n.getType()) {
-            case "chat":
-                Toast.makeText(getContext(), "Otvaranje četa...", Toast.LENGTH_SHORT).show();
+            case "chat": {
+                androidx.fragment.app.FragmentManager fm = requireActivity().getSupportFragmentManager();
+                fm.beginTransaction()
+                        .replace(R.id.fragment_container, new RegionalChatFragment())
+                        .addToBackStack(null)
+                        .commit();
                 break;
-            case "ranking":
-                Toast.makeText(getContext(), "Otvaranje rang liste...", Toast.LENGTH_SHORT).show();
+            }
+            case "ranking": {
+                androidx.fragment.app.FragmentManager fm = requireActivity().getSupportFragmentManager();
+                fm.beginTransaction()
+                        .replace(R.id.fragment_container, new LeaderboardFragment())
+                        .addToBackStack(null)
+                        .commit();
                 break;
-            case "rewards":
-                Toast.makeText(getContext(), "Otvaranje nagrada...", Toast.LENGTH_SHORT).show();
+            }
+            case "rewards": {
+                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle(n.getTitle())
+                        .setMessage(n.getBody())
+                        .setPositiveButton("Preuzmi", (d, w) -> {
+                            d.dismiss();
+                        })
+                        .setCancelable(true)
+                        .show();
                 break;
-            default:
-                Toast.makeText(getContext(), "Akcija izvršena", Toast.LENGTH_SHORT).show();
+            }
+            default: {
+                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle(n.getTitle())
+                        .setMessage(n.getBody())
+                        .setPositiveButton("OK", (d, w) -> d.dismiss())
+                        .setCancelable(true)
+                        .show();
                 break;
+            }
         }
     }
 }

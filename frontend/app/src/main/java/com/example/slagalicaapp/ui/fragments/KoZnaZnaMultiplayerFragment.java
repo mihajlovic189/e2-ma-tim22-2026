@@ -158,7 +158,8 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
                 answerButtons[i].setText(labels[i] + ". " + opts.get(i));
             }
 
-            long remaining = startedAt + QUESTION_TIME_MS - System.currentTimeMillis();
+            long nowMs = (manager != null) ? manager.getServerTimeMs() : System.currentTimeMillis();
+            long remaining = startedAt + QUESTION_TIME_MS - nowMs;
             if (remaining > QUESTION_TIME_MS) remaining = QUESTION_TIME_MS;
             if (remaining < 300) remaining = 300;
             startQuestionTimer(remaining);
@@ -209,7 +210,7 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
                     if (isGameOver || !isAdded()) return;
                     int nextIndex = index + 1;
                     if (nextIndex < questions.size()) {
-                        manager.advanceToNextQuestion(nextIndex, System.currentTimeMillis());
+                        manager.advanceToNextQuestion(nextIndex, manager.getServerTimeMs());
                     } else {
                         manager.finishGame(p1Score, p2Score);
                     }
@@ -245,6 +246,7 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
 
             Bundle result = new Bundle();
             result.putBoolean("finished", true);
+            result.putBoolean("forfeit", forfeitBy != null);
             getParentFragmentManager().setFragmentResult("GAME_FINISHED", result);
         });
     }
@@ -267,7 +269,7 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
         if (isStandaloneMode) {
             standaloneEvaluate(answerIndex);
         } else {
-            long kliknutoU = System.currentTimeMillis();
+            long kliknutoU = manager.getServerTimeMs();
             if (myPlayerNumber == 1) {
                 p1AnswerTime = kliknutoU;
                 p1TrackedAnswer = answerIndex;
@@ -433,7 +435,11 @@ public class KoZnaZnaMultiplayerFragment extends Fragment implements KoZnaZnaMan
 
         Question q = questions.get(currentQuestionIndex);
         int correct = q.getCorrectAnswerIndex();
-        if (chosenIndex == correct) standaloneScore += POINTS_CORRECT;
+        if (chosenIndex == correct) {
+            standaloneScore += POINTS_CORRECT;
+        } else if (chosenIndex != -1) {
+            standaloneScore += POINTS_INCORRECT;
+        }
 
         tvP1Score.setText(String.valueOf(cumulativePoints + standaloneScore));
         highlightAnswers(chosenIndex, -1, correct);

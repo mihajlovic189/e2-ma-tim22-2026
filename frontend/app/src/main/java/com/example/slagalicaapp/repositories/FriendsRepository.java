@@ -196,14 +196,23 @@ public class FriendsRepository {
             // Their entry – requires my own profile data
             db.collection("users").document(me.getUid()).get()
                     .addOnSuccessListener(myDoc -> {
+                        String myUsername = myDoc.getString("username") != null
+                                ? myDoc.getString("username") : "Nepoznat igrač";
                         Map<String, Object> myData = new HashMap<>();
-                        myData.put("username", myDoc.getString("username") != null
-                                ? myDoc.getString("username") : "");
+                        myData.put("username", myUsername);
                         myData.put("avatarUri", myDoc.getString("avatarUri") != null
                                 ? myDoc.getString("avatarUri") : "");
                         myData.put("addedAt", System.currentTimeMillis());
                         theirRef.set(myData)
-                                .addOnSuccessListener(u2 -> result.setValue(true))
+                                .addOnSuccessListener(u2 -> {
+                                    // Notify the friend that they were added
+                                    NotificationRepository.saveForUser(
+                                            friend.getUid(),
+                                            "Novi prijatelj",
+                                            myUsername + " te je dodao kao prijatelja.",
+                                            "other");
+                                    result.setValue(true);
+                                })
                                 .addOnFailureListener(e -> result.setValue(false));
                     })
                     .addOnFailureListener(e -> result.setValue(false));

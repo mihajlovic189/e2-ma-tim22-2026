@@ -4,9 +4,12 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.slagalicaapp.model.GameResult;
+import com.example.slagalicaapp.repositories.DailyMissionsRepository;
 import com.example.slagalicaapp.repositories.GameResultRepository;
+import com.example.slagalicaapp.repositories.TournamentRepository;
 import com.example.slagalicaapp.R;
 import com.example.slagalicaapp.data.firebase.ChallengeManager; // DODATO
 import com.example.slagalicaapp.ui.fragments.KorakPoKorakFragment;
@@ -27,17 +30,22 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class GameActivity extends AppCompatActivity {
 
     private static final String TAG = "GameActivity";
 
-    public static final String EXTRA_ROOM_ID   = "ROOM_ID";
+    public static final String EXTRA_ROOM_ID      = "ROOM_ID";
     public static final String EXTRA_CHALLENGE_ID = "CHALLENGE_ID"; // DODATO
-    public static final String EXTRA_PLAYER_NUM = "PLAYER_NUM";
-    public static final String EXTRA_PLAYER_NAME = "PLAYER_NAME";
+    public static final String EXTRA_PLAYER_NUM   = "PLAYER_NUM";
+    public static final String EXTRA_PLAYER_NAME  = "PLAYER_NAME";
+    public static final String EXTRA_TOURNAMENT_ID    = "TOURNAMENT_ID";
+    public static final String EXTRA_TOURNAMENT_ROUND = "TOURNAMENT_ROUND"; // "semi1"/"semi2"/"final"
 
     public static final String GAME_MECH     = "SLAGALICA_MECH";
 
@@ -55,6 +63,10 @@ public class GameActivity extends AppCompatActivity {
     private String playerName;
     private boolean hasForfeited = false;
     private boolean finalResultSaved = false;
+    private boolean isFriendlyMatch = false;
+    // Set once the opponent forfeits mid-match: the remaining player keeps playing
+    // solo through the rest of the sub-game sequence instead of the match ending.
+    private boolean soloMode = false;
 
     // Lokalni brojač poena za samostalno igranje u Izazovu
     private int ukupniPoeniIzazova = 0;
@@ -85,11 +97,17 @@ public class GameActivity extends AppCompatActivity {
 
         getSupportFragmentManager().setFragmentResultListener(
                 "GAME_FINISHED", this, (requestKey, result) -> {
+                    // Sub-game managers detect the same "status=forfeit" write GameActivity's
+                    // own room listener reacts to, and can still be attached (fragment swap
+                    // via commitAllowingStateLoss() is async) when they fire it — that's a
+                    // stale echo of a forfeit GameActivity already handled, not a real finish.
+                    if (result.getBoolean("forfeit", false)) return;
+
                     // Ako fragment vraća sakupljene poene, dodajemo ih u zbir za izazov
                     if (result.containsKey("points")) {
                         ukupniPoeniIzazova += result.getInt("points");
                     }
-                    handleSubGameFinished();
+                    handleSubGameFinished(result);
                 });
 
         if (challengeId != null) {
@@ -98,8 +116,25 @@ public class GameActivity extends AppCompatActivity {
         } else {
             // Standardni 1v1 multiplayer preko soba
             roomRef = FirebaseDatabase.getInstance().getReference().child("rooms").child(GAME_MECH).child(roomId);
-            resolvePlayerNumberFromRoom(this::pratiStanjePartije);
+            resolvePlayerNumberFromRoom(() -> {
+                registerDisconnectForfeit();
+                pratiStanjePartije();
+            });
         }
+    }
+
+    // Most game screens don't even have a "give up" button, so the only realistic way
+    // most quits happen is the app getting closed/killed or the connection dropping.
+    // Without this, the opponent (and the whole tournament bracket behind them) would
+    // just wait forever. Mirrors the same fields forfeitMatch() writes explicitly.
+    private void registerDisconnectForfeit() {
+        if (roomRef == null) return;
+        Map<String, Object> disconnectUpdate = new HashMap<>();
+        disconnectUpdate.put("player" + playerNumber + "Left", true);
+        disconnectUpdate.put("status", "forfeit");
+        disconnectUpdate.put("forfeitBy", "player" + playerNumber);
+        disconnectUpdate.put("winner", playerNumber == 1 ? "player2" : "player1");
+        roomRef.onDisconnect().updateChildren(disconnectUpdate);
     }
 
     private void pratiStanjePartije() {
@@ -116,8 +151,13 @@ public class GameActivity extends AppCompatActivity {
 
                 String status = snapshot.child("status").getValue(String.class);
                 if ("forfeit".equals(status)) {
-                    roomRef.removeEventListener(this);
-                    persistFinalResultAndFinish(true);
+                    if (!soloMode) {
+                        soloMode = true;
+                        roomRef.removeEventListener(this);
+                        Toast.makeText(GameActivity.this,
+                                "Protivnik je napustio partiju. Nastavljate sami.", Toast.LENGTH_LONG).show();
+                        showGameFragment(currentSubGame);
+                    }
                     return;
                 }
 
@@ -138,29 +178,35 @@ public class GameActivity extends AppCompatActivity {
         roomRef.addValueEventListener(roomListener);
     }
 
-    private void handleSubGameFinished() {
+    /** Redosled šest podigara; vraća null kad je GAME_MOJ_BROJ (poslednja) upravo završena. */
+    private String nextSubGame(String current) {
+        if (GAME_KO_ZNA_ZNA.equals(current))   return GAME_SPOJNICE;
+        if (GAME_SPOJNICE.equals(current))     return GAME_ASOCIJACIJE;
+        if (GAME_ASOCIJACIJE.equals(current))  return GAME_SKOCKO;
+        if (GAME_SKOCKO.equals(current))       return GAME_KORAK;
+        if (GAME_KORAK.equals(current))        return GAME_MOJ_BROJ;
+        return null;
+    }
+
+    private void handleSubGameFinished(android.os.Bundle result) {
         // GRANANJE LOGIKE: Ako je izazov, igrač samostalno menja igre lokalno
         if (challengeId != null) {
-            switch (currentSubGame) {
-                case GAME_KO_ZNA_ZNA:
-                    currentSubGame = GAME_SPOJNICE;
-                    break;
-                case GAME_SPOJNICE:
-                    currentSubGame = GAME_ASOCIJACIJE;
-                    break;
-                case GAME_ASOCIJACIJE:
-                    currentSubGame = GAME_SKOCKO;
-                    break;
-                case GAME_SKOCKO:
-                    currentSubGame = GAME_KORAK;
-                    break;
-                case GAME_KORAK:
-                    currentSubGame = GAME_MOJ_BROJ;
-                    break;
-                case GAME_MOJ_BROJ:
-                    završiIzazovIUpisiRezultat();
-                    return;
+            String next = nextSubGame(currentSubGame);
+            if (next == null) {
+                završiIzazovIUpisiRezultat();
+                return;
             }
+            currentSubGame = next;
+            showGameFragment(currentSubGame);
+        } else if (soloMode) {
+            // Protivnik je napustio partiju — nastavljamo kroz preostale podigre sami,
+            // isto kao u Izazovu, ali na kraju čuvamo pravi rezultat meča (ne Challenge).
+            String next = nextSubGame(currentSubGame);
+            if (next == null) {
+                finishSoloMatchAfterForfeit();
+                return;
+            }
+            currentSubGame = next;
             showGameFragment(currentSubGame);
         } else {
             // Standardna 1v1 multiplayer logika (sinhronizovana preko baze)
@@ -170,17 +216,29 @@ public class GameActivity extends AppCompatActivity {
                 return;
             }
             if (playerNumber == 1) {
-                String nextGame;
-                if (GAME_KO_ZNA_ZNA.equals(currentSubGame))   nextGame = GAME_SPOJNICE;
-                else if (GAME_SPOJNICE.equals(currentSubGame)) nextGame = GAME_ASOCIJACIJE;
-                else if (GAME_ASOCIJACIJE.equals(currentSubGame)) nextGame = GAME_SKOCKO;
-                else if (GAME_SKOCKO.equals(currentSubGame))   nextGame = GAME_KORAK;
-                else nextGame = GAME_MOJ_BROJ;
+                String nextGame = nextSubGame(currentSubGame);
 
-                Map<String, Object> transition = new HashMap<>();
-                transition.put("currentGameType", nextGame);
-                transition.put("status", "playing");
-                roomRef.updateChildren(transition);
+                // Snapshot the cumulative score at the moment this sub-game ends, so the
+                // per-sub-game contribution can be recovered later (scores/player1-2 is a
+                // single running total shared across all six sub-games).
+                String finishedSubGame = currentSubGame;
+                roomRef.child("scores").get()
+                        .addOnSuccessListener(scoresSnap -> {
+                            Map<String, Object> transition = new HashMap<>();
+                            transition.put("currentGameType", nextGame);
+                            transition.put("status", "playing");
+                            transition.put("subGameScores/" + finishedSubGame + "/player1",
+                                    readLong(scoresSnap.child("player1").getValue(), 0L));
+                            transition.put("subGameScores/" + finishedSubGame + "/player2",
+                                    readLong(scoresSnap.child("player2").getValue(), 0L));
+                            roomRef.updateChildren(transition);
+                        })
+                        .addOnFailureListener(e -> {
+                            Map<String, Object> transition = new HashMap<>();
+                            transition.put("currentGameType", nextGame);
+                            transition.put("status", "playing");
+                            roomRef.updateChildren(transition);
+                        });
             }
         }
     }
@@ -208,6 +266,8 @@ public class GameActivity extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 String p1Uid = snapshot.child("player1Uid").getValue(String.class);
                 String p2Uid = snapshot.child("player2Uid").getValue(String.class);
+                Boolean friendly = snapshot.child("isFriendly").getValue(Boolean.class);
+                isFriendlyMatch = friendly != null && friendly;
 
                 FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
                 String uid = user != null ? user.getUid() : null;
@@ -236,7 +296,7 @@ public class GameActivity extends AppCompatActivity {
 
     private void showGameFragment(String gameType) {
         Bundle args = new Bundle();
-        args.putString("roomId", roomId);
+        args.putString("roomId", soloMode ? null : roomId);
         args.putString("challengeId", challengeId);
         args.putInt("playerNumber", playerNumber);
         args.putInt("cumulativePoints", ukupniPoeniIzazova);
@@ -265,6 +325,25 @@ public class GameActivity extends AppCompatActivity {
                 .commitAllowingStateLoss();
     }
 
+    @Override
+    public void onBackPressed() {
+        // Most minigame screens have no "give up" button, so back-navigation was the
+        // only way most players actually left mid-match — and it used to just finish()
+        // silently, leaving the opponent (and the tournament bracket) waiting forever
+        // because no forfeit was ever recorded. Route it through the same forfeit path
+        // the explicit give-up button uses, with the same confirmation.
+        if (roomId == null || hasForfeited || finalResultSaved) {
+            super.onBackPressed();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Odustajanje")
+                .setMessage("Ako izađeš, smatra se da si izgubio partiju. Da li želiš da odustaneš?")
+                .setPositiveButton("Odustani", (dialog, which) -> forfeitMatch())
+                .setNegativeButton("Nastavi", null)
+                .show();
+    }
+
     public void forfeitMatch() {
         if (challengeId != null) {
             završiIzazovIUpisiRezultat();
@@ -275,6 +354,7 @@ public class GameActivity extends AppCompatActivity {
         hasForfeited = true;
 
         if (roomListener != null) roomRef.removeEventListener(roomListener);
+        roomRef.onDisconnect().cancel();
 
         String myLeftKey = "player" + playerNumber + "Left";
         String opponentKey = playerNumber == 1 ? "player2" : "player1";
@@ -296,17 +376,43 @@ public class GameActivity extends AppCompatActivity {
             return;
         }
 
+        if (isFriendlyMatch) {
+            Toast.makeText(GameActivity.this, "Napustili ste prijateljsku partiju.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        DatabaseReference myScoreRef = roomRef.child("scores").child("player" + playerNumber);
+
         FirebaseFirestore.getInstance().collection("users").document(currentUser.getUid())
                 .get()
                 .addOnSuccessListener(doc -> {
                     long trenutneZvezde = doc.getLong("totalStars") != null ? doc.getLong("totalStars") : 0;
-                    long noveZvezde = Math.max(0, trenutneZvezde - 10);
-                    FirebaseFirestore.getInstance().collection("users").document(currentUser.getUid())
-                            .update("totalStars", noveZvezde);
-                    Toast.makeText(GameActivity.this, "Napustili ste partiju. Izgubili ste 10 zvezda.", Toast.LENGTH_SHORT).show();
-                    finish();
+                    myScoreRef.get()
+                            .addOnSuccessListener(scoreSnap ->
+                                    applyLeaveDefeatPenalty(currentUser.getUid(), readInt(scoreSnap.getValue(), 0), trenutneZvezde))
+                            .addOnFailureListener(e ->
+                                    applyLeaveDefeatPenalty(currentUser.getUid(), 0, trenutneZvezde));
                 })
                 .addOnFailureListener(e -> finish());
+    }
+
+    /**
+     * Napuštanje partije se tretira kao normalan poraz — isti formula za gubitak
+     * zvezda kao i kada partija bude regularno izgubljena (StatsCalculator).
+     */
+    private void applyLeaveDefeatPenalty(String uid, int mojSkor, long trenutneZvezde) {
+        Map<String, Integer> epilog = StatsCalculator.obradiKrajPartije(false, mojSkor, (int) trenutneZvezde);
+        int finalneZvezde = epilog.get("finalStars");
+        int razlika = epilog.get("starDifference");
+
+        FirebaseFirestore.getInstance().collection("users").document(uid)
+                .update("totalStars", (long) finalneZvezde)
+                .addOnCompleteListener(t -> {
+                    String poruka = "Napustili ste partiju. " + (razlika >= 0 ? "+" : "") + razlika + " zvezda.";
+                    Toast.makeText(GameActivity.this, poruka, Toast.LENGTH_SHORT).show();
+                    finish();
+                });
     }
 
     private void persistFinalResultAndFinish(boolean forfeit) {
@@ -323,6 +429,7 @@ public class GameActivity extends AppCompatActivity {
         }
 
         finalResultSaved = true;
+        if (roomRef != null) roomRef.onDisconnect().cancel();
         long finishedAt = System.currentTimeMillis();
         String firestoreCollection = "slagalica_match_results";
 
@@ -341,16 +448,59 @@ public class GameActivity extends AppCompatActivity {
 
                 gameResultRepository.saveGameResult(result, firestoreCollection)
                         .addOnSuccessListener(documentReference -> {
+                            String tournamentId    = getIntent().getStringExtra(EXTRA_TOURNAMENT_ID);
+                            String tournamentRound = getIntent().getStringExtra(EXTRA_TOURNAMENT_ROUND);
+                            if (tournamentId != null && tournamentRound != null) {
+                                handleTournamentMatchEnd(result, tournamentId, tournamentRound);
+                                return;
+                            }
+
+                            DailyMissionsRepository missionsRepo = new DailyMissionsRepository();
                             if (!isFriendly) {
-                                primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                if (currentUser.getUid().equals(result.winnerUid)) {
+                                    missionsRepo.completeMission("winMatch", new DailyMissionsRepository.MissionCallback() {
+                                        @Override public void onSuccess(boolean newlyCompleted) {
+                                            primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                        }
+                                        @Override public void onError(String error) {
+                                            primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                        }
+                                    });
+                                } else {
+                                    primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                }
                             } else {
+                                missionsRepo.completeMission("friendlyMatch", null);
                                 Toast.makeText(GameActivity.this, "Prijateljska partija završena.", Toast.LENGTH_LONG).show();
                                 ocistiSobuIAzurnoZavrsi();
                             }
                         })
                         .addOnFailureListener(e -> {
-                            Log.e(TAG, "Greška pri čuvanju u Firestore", e);
-                            ocistiSobuIAzurnoZavrsi();
+                            Log.e(TAG, "Greška pri čuvanju u Firestore: " + e.getMessage(), e);
+                            String tournamentId    = getIntent().getStringExtra(EXTRA_TOURNAMENT_ID);
+                            String tournamentRound = getIntent().getStringExtra(EXTRA_TOURNAMENT_ROUND);
+                            if (tournamentId != null && tournamentRound != null) {
+                                handleTournamentMatchEnd(result, tournamentId, tournamentRound);
+                                return;
+                            }
+
+                            // Economy/leaderboard update runs even if match-result save fails
+                            if (!isFriendly) {
+                                if (currentUser.getUid().equals(result.winnerUid)) {
+                                    new DailyMissionsRepository().completeMission("winMatch", new DailyMissionsRepository.MissionCallback() {
+                                        @Override public void onSuccess(boolean newlyCompleted) {
+                                            primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                        }
+                                        @Override public void onError(String error) {
+                                            primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                        }
+                                    });
+                                } else {
+                                    primeniEkonomijuZvezdaITokena(result, currentUser.getUid());
+                                }
+                            } else {
+                                ocistiSobuIAzurnoZavrsi();
+                            }
                         });
             }
 
@@ -359,6 +509,47 @@ public class GameActivity extends AppCompatActivity {
                 finish();
             }
         });
+    }
+
+    /**
+     * Protivnik je napustio partiju, a ja sam odigrao preostale podigre sam (soloMode).
+     * scores/player{playerNumber} u sobi drži samo poene osvojene DO trenutka napuštanja —
+     * dodajemo poene osvojene posle toga (ukupniPoeniIzazova) pre nego što se meč sačuva
+     * kroz standardni persistFinalResultAndFinish tok (koji već ispravno tretira pobedu).
+     */
+    private void finishSoloMatchAfterForfeit() {
+        if (roomRef == null) { finish(); return; }
+
+        DatabaseReference myScoreRef = roomRef.child("scores").child("player" + playerNumber);
+        myScoreRef.get()
+                .addOnSuccessListener(scoreSnap -> {
+                    long baseScore = readLong(scoreSnap.getValue(), 0L);
+                    myScoreRef.setValue(baseScore + ukupniPoeniIzazova)
+                            .addOnCompleteListener(t -> persistFinalResultAndFinish(true));
+                })
+                .addOnFailureListener(e -> persistFinalResultAndFinish(true));
+    }
+
+    private void handleTournamentMatchEnd(GameResult result, String tournamentId,
+                                           String tournamentRound) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) { ocistiSobuIAzurnoZavrsi(); return; }
+
+        String myUid = user.getUid();
+        boolean iWon  = myUid.equals(result.winnerUid);
+        int myScore   = myUid.equals(result.player1Uid) ? result.player1Score : result.player2Score;
+
+        if (iWon && "final".equals(tournamentRound)) {
+            new DailyMissionsRepository().completeMission("winTournament", null);
+        }
+
+        new TournamentRepository().reportMatchResult(
+                tournamentId, tournamentRound, result.winnerUid,
+                myUid, myScore, iWon,
+                new TournamentRepository.ResultCallback() {
+                    @Override public void onDone()         { ocistiSobuIAzurnoZavrsi(); }
+                    @Override public void onError(String m){ ocistiSobuIAzurnoZavrsi(); }
+                });
     }
 
     private void primeniEkonomijuZvezdaITokena(GameResult result, String currentUid) {
@@ -408,6 +599,30 @@ public class GameActivity extends AppCompatActivity {
                     updates.put("totalStars", finalneZvezde);
                     updates.put("tokenCount", trenutniTokeni + nagradniTokeni);
 
+                    String currentWeek = getCurrentWeekId();
+                    String currentMonth = getCurrentMonthId();
+                    updates.put("cycleWeek", currentWeek);
+                    updates.put("cycleMonth", currentMonth);
+                    Long curWeekly = doc.getLong("weeklyStars");
+                    Long curMonthly = doc.getLong("monthlyStars");
+                    String docCycleWeek = doc.getString("cycleWeek");
+                    String docCycleMonth = doc.getString("cycleMonth");
+                    int baseWeekly = currentWeek.equals(docCycleWeek) && curWeekly != null ? curWeekly.intValue() : 0;
+                    int baseMonthly = currentMonth.equals(docCycleMonth) && curMonthly != null ? curMonthly.intValue() : 0;
+                    int newWeekly = Math.max(0, baseWeekly + razlikaZvezda);
+                    int newMonthly = Math.max(0, baseMonthly + razlikaZvezda);
+                    updates.put("weeklyStars", (long) newWeekly);
+                    updates.put("monthlyStars", (long) newMonthly);
+
+                    long baseWeeklyGames = currentWeek.equals(docCycleWeek) && doc.getLong("weeklyGamesPlayed") != null
+                            ? doc.getLong("weeklyGamesPlayed") : 0L;
+                    long baseMonthlyGames = currentMonth.equals(docCycleMonth) && doc.getLong("monthlyGamesPlayed") != null
+                            ? doc.getLong("monthlyGamesPlayed") : 0L;
+                    updates.put("weeklyGamesPlayed", baseWeeklyGames + 1);
+                    updates.put("monthlyGamesPlayed", baseMonthlyGames + 1);
+                    Long curGames = doc.getLong("totalGamesPlayed");
+                    updates.put("totalGamesPlayed", (curGames != null ? curGames : 0) + 1);
+
                     final int finalRazlika = razlikaZvezda;
                     final int finalNagrada = nagradniTokeni;
                     final boolean finalPobeda = samJaPobednik;
@@ -424,14 +639,36 @@ public class GameActivity extends AppCompatActivity {
                                 Toast.makeText(GameActivity.this, poruka, Toast.LENGTH_LONG).show();
                                 ocistiSobuIAzurnoZavrsi();
                             })
-                            .addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "primeniEkonomiju: update failed: " + e.getMessage(), e);
+                                ocistiSobuIAzurnoZavrsi();
+                            });
                 })
-                .addOnFailureListener(e -> ocistiSobuIAzurnoZavrsi());
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "primeniEkonomiju: doc read failed: " + e.getMessage(), e);
+                    ocistiSobuIAzurnoZavrsi();
+                });
+    }
+
+    private String getCurrentWeekId() {
+        Calendar cal = Calendar.getInstance();
+        cal.setFirstDayOfWeek(Calendar.MONDAY);
+        int week = cal.get(Calendar.WEEK_OF_YEAR);
+        int year = cal.get(Calendar.YEAR);
+        return String.format(Locale.US, "%d-W%02d", year, week);
+    }
+
+    private String getCurrentMonthId() {
+        return new SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(new java.util.Date());
     }
 
     private void ocistiSobuIAzurnoZavrsi() {
         if (roomId != null) {
-            if (hasForfeited || playerNumber == 1) {
+            // playerNumber==1 normally "wins" the cleanup race so both clients don't try to
+            // delete the same room when a match ends normally (both reach this ~simultaneously).
+            // In soloMode the opponent already forfeited and is gone, so whichever player number
+            // I am, I'm the only one left who can ever clean this room up.
+            if (hasForfeited || playerNumber == 1 || soloMode) {
                 roomRef.removeValue().addOnCompleteListener(t -> finish());
             } else {
                 finish();
@@ -476,7 +713,7 @@ public class GameActivity extends AppCompatActivity {
 
         long durationMs = Math.max(0L, finishedAt - startedAt);
 
-        return new GameResult(
+        GameResult result = new GameResult(
                 gameType,
                 player1Uid,
                 player1Name,
@@ -489,6 +726,54 @@ public class GameActivity extends AppCompatActivity {
                 durationMs,
                 6
         );
+
+        if (GAME_MECH.equals(gameType)) {
+            result.subGameScores = buildSubGameScoreBreakdown(snapshot, player1Score, player2Score);
+        }
+
+        return result;
+    }
+
+    private static final String[] SUBGAME_SEQUENCE = {
+            GAME_KO_ZNA_ZNA, GAME_SPOJNICE, GAME_ASOCIJACIJE, GAME_SKOCKO, GAME_KORAK, GAME_MOJ_BROJ
+    };
+
+    /**
+     * scores/player1-2 is one running total shared by all six sub-games. subGameScores/{TYPE}
+     * holds that running total as it stood right when TYPE finished, so each sub-game's own
+     * contribution is the difference from the previous sub-game's checkpoint. If the match ended
+     * (e.g. forfeit) before a sub-game's checkpoint was written, decomposition stops there.
+     */
+    private Map<String, Map<String, Long>> buildSubGameScoreBreakdown(DataSnapshot snapshot, int finalP1, int finalP2) {
+        Map<String, Map<String, Long>> breakdown = new HashMap<>();
+        DataSnapshot checkpoints = snapshot.child("subGameScores");
+
+        long prevP1 = 0L, prevP2 = 0L;
+        for (int i = 0; i < SUBGAME_SEQUENCE.length; i++) {
+            String type = SUBGAME_SEQUENCE[i];
+            boolean isLast = i == SUBGAME_SEQUENCE.length - 1;
+
+            long cumP1, cumP2;
+            if (isLast) {
+                cumP1 = finalP1;
+                cumP2 = finalP2;
+            } else {
+                DataSnapshot checkpoint = checkpoints.child(type);
+                if (!checkpoint.exists()) break;
+                cumP1 = readLong(checkpoint.child("player1").getValue(), prevP1);
+                cumP2 = readLong(checkpoint.child("player2").getValue(), prevP2);
+            }
+
+            Map<String, Long> delta = new HashMap<>();
+            delta.put("player1", Math.max(0L, cumP1 - prevP1));
+            delta.put("player2", Math.max(0L, cumP2 - prevP2));
+            breakdown.put(type, delta);
+
+            prevP1 = cumP1;
+            prevP2 = cumP2;
+        }
+
+        return breakdown;
     }
 
     private int readInt(Object value, int fallback) {
